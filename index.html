@@ -1,0 +1,1243 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#6E67A8">
+<title>Transector · MAPEX</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="leaflet/leaflet.css">
+<style>
+/* =====================================================================
+   COLORES DEL MAPEX
+   ===================================================================== */
+:root{
+  --turquesa:#5BC5CF; --turquesa-osc:#2E9AA5;
+  --lila:#9E98C9;     --lila-osc:#6E67A8;
+  --gris:#87888A;     --gris-osc:#4A4B4D;
+  --fondo:#F5F6FA; --borde:#DADCE5; --rojo:#C9443F; --verde:#3E9E62; --ambar:#D99A2B;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--fondo);color:var(--gris-osc);font-size:16px}
+button,input,select,textarea{font:inherit}
+.oculto{display:none !important}
+
+/* ---------- Barra superior de las pantallas ---------- */
+.barra-sup{background:var(--lila-osc);color:#fff;padding:12px 14px;padding-top:calc(12px + env(safe-area-inset-top));display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:20}
+.barra-sup h1{font-size:18px;margin:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.barra-sup button{background:rgba(255,255,255,.18);border:0;color:#fff;border-radius:8px;padding:7px 11px}
+.contenido{padding:16px;max-width:640px;margin:0 auto;padding-bottom:40px}
+
+/* ---------- Tarjetas y botones ---------- */
+.tarjeta{background:#fff;border:1px solid var(--borde);border-radius:12px;padding:14px 16px;margin-bottom:14px}
+.tarjeta h2{font-size:16px;margin:0 0 8px;color:var(--lila-osc)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--borde);background:#fff;color:var(--gris-osc);padding:11px 16px;border-radius:10px;cursor:pointer}
+.btn.prim{background:var(--lila-osc);border-color:var(--lila-osc);color:#fff}
+.btn.turq{background:var(--turquesa-osc);border-color:var(--turquesa-osc);color:#fff}
+.btn.rojo{background:var(--rojo);border-color:var(--rojo);color:#fff}
+.btn.ancho{width:100%}
+.btn.chico{padding:6px 10px;font-size:14px;border-radius:8px}
+.btn:disabled{opacity:.5}
+.ayuda{color:var(--gris);font-size:13.5px;margin:4px 0 0}
+label.campo{display:block;margin-bottom:14px;font-size:14px;font-weight:600}
+label.campo input,label.campo select,label.campo textarea{display:block;width:100%;margin-top:5px;padding:11px 12px;border:1px solid var(--borde);border-radius:10px;font-weight:normal;background:#fff}
+label.campo textarea{min-height:70px;resize:vertical}
+.opciones{display:flex;gap:8px}
+.opciones label{flex:1;border:1px solid var(--borde);border-radius:10px;padding:11px;text-align:center;font-weight:600;background:#fff}
+.opciones input{display:none}
+.opciones label:has(input:checked){border-color:var(--lila-osc);background:#EEEDF7;color:var(--lila-osc)}
+.lista-item{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid #EEF0F4}
+.lista-item:last-child{border-bottom:0}
+.lista-item .info{flex:1;min-width:0}
+.lista-item .info b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lista-item .info small{color:var(--gris)}
+.etiqueta{display:inline-block;padding:2px 8px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap}
+.etiqueta.si{background:#E1F3E8;color:var(--verde)}
+.etiqueta.no{background:#FBEFD9;color:#9A6A10}
+.etiqueta.lila{background:#EEEDF7;color:var(--lila-osc)}
+.vacio{color:var(--gris);text-align:center;padding:14px;font-size:14px}
+.estado-red{font-size:12px;padding:3px 9px;border-radius:20px;background:rgba(255,255,255,.2)}
+
+/* ---------- Pantalla de entrada ---------- */
+.entrada{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;background:#fff}
+.entrada img{height:170px;margin-bottom:8px}
+.entrada h1{margin:0;color:var(--lila-osc);font-size:26px}
+.entrada p{color:var(--gris);margin:4px 0 22px;font-size:14px}
+.entrada .caja{width:100%;max-width:360px}
+
+/* ---------- Recorrido (mapa a pantalla completa) ---------- */
+.recorrido{position:fixed;inset:0;display:flex;flex-direction:column}
+.recorrido .barra-sup{position:relative}
+.recorrido .datos{font-size:12.5px;opacity:.9;display:block;font-weight:normal}
+#mapa{flex:1;background:#e8e8e8}
+.panel-rec{background:#fff;border-top:1px solid var(--borde);padding:10px 12px;padding-bottom:calc(10px + env(safe-area-inset-bottom));display:grid;grid-template-columns:1fr 1.6fr 1fr;gap:10px;align-items:center}
+.btn-captura{background:var(--turquesa-osc);color:#fff;border:0;border-radius:16px;padding:16px 10px;font-size:18px;font-weight:700;box-shadow:0 4px 14px rgba(46,154,165,.35)}
+.btn-captura:disabled{background:#B9C7C9;box-shadow:none}
+.aviso-rec{position:absolute;left:10px;right:10px;top:calc(70px + env(safe-area-inset-top));z-index:500;background:#FFF6E0;border:1px solid #F0D58A;color:#7A5A10;border-radius:10px;padding:8px 12px;font-size:13.5px}
+.pin{width:26px;height:26px;border-radius:50%;color:#fff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+
+/* ---------- Ventanas (modales) ---------- */
+.modal{position:fixed;inset:0;background:rgba(30,30,50,.5);z-index:1000;display:flex;align-items:flex-end;justify-content:center}
+.modal .caja{background:#fff;width:100%;max-width:640px;max-height:94%;overflow:auto;border-radius:18px 18px 0 0;padding:18px 16px;padding-bottom:calc(18px + env(safe-area-inset-bottom))}
+.modal h3{margin:0 0 12px;color:var(--lila-osc)}
+.modal.completa .caja{height:100%;max-height:100%;border-radius:0;padding-top:calc(14px + env(safe-area-inset-top))}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:2px solid transparent;border-radius:22px;padding:8px 13px;font-weight:600;font-size:15px;background:#F1F1F5;color:var(--gris-osc)}
+.chip.elegido{color:#fff}
+.miniaturas{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.miniaturas .mini{position:relative}
+.miniaturas img{width:84px;height:84px;object-fit:cover;border-radius:8px;display:block}
+.miniaturas .quitar{position:absolute;top:-6px;right:-6px;width:24px;height:24px;border-radius:50%;border:0;background:var(--rojo);color:#fff;font-size:13px;line-height:24px;padding:0}
+.audio-item,.nota-item{display:flex;align-items:center;gap:8px;margin-top:8px}
+.audio-item audio{flex:1;height:38px}
+.nota-item div{flex:1;background:#F6F6FA;border-radius:8px;padding:8px 10px;font-size:14.5px;white-space:pre-wrap}
+.grabando{color:var(--rojo);font-weight:700}
+.seccion{border-top:1px solid #EEF0F4;padding-top:12px;margin-top:12px}
+.seccion > b{display:block;margin-bottom:6px}
+
+/* ---------- Detalle de un transecto ---------- */
+#mapaDetalle{height:280px;border-radius:12px;border:1px solid var(--borde);margin-bottom:14px}
+.resumen{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;font-size:14px}
+.resumen span{color:var(--gris)}
+.punto-det{border-top:1px solid #EEF0F4;padding:12px 0}
+.punto-det h4{margin:0 0 6px;display:flex;align-items:center;gap:8px;font-size:15px}
+
+/* ---------- Mensaje flotante ---------- */
+.toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);background:var(--gris-osc);color:#fff;padding:11px 16px;border-radius:10px;opacity:0;transition:.25s;pointer-events:none;z-index:2000;width:max-content;max-width:92vw;font-size:14.5px;text-align:center}
+.toast.ver{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.error{background:var(--rojo)}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="modales"></div>
+<div class="toast" id="toast"></div>
+
+<script src="leaflet/leaflet.js"></script>
+<script>
+/* =====================================================================
+   APP TRANSECTOR (PWA) — transectos urbanos · herramienta de apoyo al MAPEX
+   Bloques:
+     1) Configuración        2) Utilidades           3) Huella (SHA-256)
+     4) Base de datos del celular (IndexedDB)        5) Conexión con Transector Central
+     6) Sesión y entrada     7) Inicio               8) Nuevo transecto (y rutas planeadas)
+     9) GPS y recorrido     10) Captura de un punto 11) Pausa y cierre
+    12) Subida (sincronización)                     13) Historial y detalle
+    14) Arranque
+
+   IDEA CENTRAL: todo se guarda PRIMERO en el celular. Internet solo se usa para
+   entrar la primera vez, para actualizar catálogos y para subir los transectos ya
+   cerrados. Así se puede recorrer la ciudad sin señal.
+   ===================================================================== */
+
+/* ---------- 1) CONFIGURACIÓN ---------- */
+// Dirección de Transector Central (la URL /exec de Apps Script).
+const URL_API = 'https://script.google.com/macros/s/AKfycbzhhuFvM-5W4zysVYpIzAHCXMklUyJjdJ-8SYVpYlOANEOJu2MQDsDHLRq1fZ1S2AjQ/exec';
+const PRECISION_MAX = 60;      // metros: lecturas del GPS peores que esto no se usan para la ruta
+const FOTO_MAX = 1600;         // pixeles del lado mayor al reducir las fotos
+const HORA_LIMITE = '23:59:00';// a esta hora se cierra solo el transecto (no puede durar más de un día)
+
+/* ---------- 2) UTILIDADES ---------- */
+const $ = (s, raiz) => (raiz || document).querySelector(s);
+const $$ = (s, raiz) => Array.from((raiz || document).querySelectorAll(s));
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function toast(msg, ms, error){
+  const t = $('#toast');
+  t.textContent = msg; t.classList.toggle('error', !!error); t.classList.add('ver');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('ver'), ms || 3200);
+}
+
+// Memoria del navegador que dura aunque se cierre la app (para datos pequeños: sesión, catálogos).
+const LS = {
+  get(k, d){ try { const v = localStorage.getItem('tr.' + k); return v === null ? d : JSON.parse(v); } catch(e){ return d; } },
+  set(k, v){ try { localStorage.setItem('tr.' + k, JSON.stringify(v)); } catch(e){} },
+  del(k){ try { localStorage.removeItem('tr.' + k); } catch(e){} }
+};
+
+// Identificador único (UUID). Cada transecto, punto y archivo lleva uno: así el
+// servidor reconoce si algo ya le había llegado y no lo duplica.
+function uuid(){
+  if (crypto.randomUUID) return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 15) | 64; b[8] = (b[8] & 63) | 128;
+  const h = Array.from(b, x => x.toString(16).padStart(2, '0')).join('');
+  return h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20);
+}
+
+// Fechas y horas LOCALES del celular (no UTC).
+const dos = n => String(n).padStart(2, '0');
+const hoy = (d = new Date()) => d.getFullYear() + '-' + dos(d.getMonth() + 1) + '-' + dos(d.getDate());
+const horaAhora = (d = new Date()) => dos(d.getHours()) + ':' + dos(d.getMinutes()) + ':' + dos(d.getSeconds());
+const fechaHora = (d = new Date()) => hoy(d) + ' ' + horaAhora(d);
+const aSeg = h => { const p = String(h).split(':').map(Number); return p[0] * 3600 + p[1] * 60 + (p[2] || 0); };
+
+function duracion(seg){
+  seg = Math.max(0, Math.round(seg));
+  const h = Math.floor(seg / 3600), m = Math.floor(seg % 3600 / 60), s = seg % 60;
+  return (h ? h + ':' + dos(m) : m) + ':' + dos(s);
+}
+function duracionMin(min){
+  if (min === null || min === undefined) return '—';
+  const h = Math.floor(min / 60), m = Math.round(min % 60);
+  return h ? h + ' h ' + m + ' min' : m + ' min';
+}
+
+// Distancia en metros entre dos puntos [lng, lat] (fórmula del haversine).
+function metros(a, b){
+  const R = 6371000, rad = g => g * Math.PI / 180;
+  const dLat = rad(b[1] - a[1]), dLng = rad(b[0] - a[0]);
+  const h = Math.sin(dLat/2)**2 + Math.cos(rad(a[1])) * Math.cos(rad(b[1])) * Math.sin(dLng/2)**2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+function kmDeTramos(tramos){
+  let m = 0;
+  tramos.forEach(t => { for (let i = 1; i < t.length; i++) m += metros(t[i-1], t[i]); });
+  return m / 1000;
+}
+
+const enLinea = () => navigator.onLine;
+
+/* ---------- 3) HUELLA DE LA CONTRASEÑA (SHA-256) ----------
+   La misma función y la misma "sal" que Transector Central. La contraseña nunca
+   viaja ni se guarda tal cual: solo su huella. */
+function sha256(texto){
+  const rr = (v, a) => (v >>> a) | (v << (32 - a));
+  const bytes = new TextEncoder().encode(texto);
+  const K = [], H = []; let p = 2, n = 0;
+  const esPrimo = x => { for (let i = 2; i*i <= x; i++) if (x % i === 0) return false; return true; };
+  while (n < 64){ if (esPrimo(p)){ if (n < 8) H[n] = (Math.pow(p, 1/2) * 2**32) | 0; K[n++] = (Math.pow(p, 1/3) * 2**32) | 0; } p++; }
+  const l = bytes.length;
+  const m = new Uint8Array(((l + 9 + 63) >> 6) << 6); m.set(bytes); m[l] = 0x80;
+  const dv = new DataView(m.buffer); dv.setUint32(m.length - 4, l * 8);
+  for (let i = 0; i < m.length; i += 64){
+    const w = []; for (let j = 0; j < 16; j++) w[j] = dv.getUint32(i + j*4);
+    for (let j = 16; j < 64; j++){ const a = w[j-15], b = w[j-2];
+      w[j] = (w[j-16] + (rr(a,7) ^ rr(a,18) ^ (a >>> 3)) + w[j-7] + (rr(b,17) ^ rr(b,19) ^ (b >>> 10))) | 0; }
+    let [a,b,c,d,e,f,g,h] = H;
+    for (let j = 0; j < 64; j++){
+      const t1 = (h + (rr(e,6) ^ rr(e,11) ^ rr(e,25)) + ((e & f) ^ (~e & g)) + K[j] + w[j]) | 0;
+      const t2 = ((rr(a,2) ^ rr(a,13) ^ rr(a,22)) + ((a & b) ^ (a & c) ^ (b & c))) | 0;
+      h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+    }
+    H[0]=(H[0]+a)|0; H[1]=(H[1]+b)|0; H[2]=(H[2]+c)|0; H[3]=(H[3]+d)|0; H[4]=(H[4]+e)|0; H[5]=(H[5]+f)|0; H[6]=(H[6]+g)|0; H[7]=(H[7]+h)|0;
+  }
+  return H.map(x => (x >>> 0).toString(16).padStart(8,'0')).join('');
+}
+const huella = txt => sha256('transector-central|' + txt);
+
+/* ---------- 4) BASE DE DATOS DEL CELULAR (IndexedDB) ----------
+   localStorage solo aguanta unos 5 MB y únicamente texto. Las fotos y audios
+   pesan mucho más, por eso usamos IndexedDB: una pequeña base de datos dentro
+   del navegador. Tiene dos "almacenes":
+     - transectos: un objeto por transecto (datos, pausas, ruta y puntos)
+     - archivos:   una foto o audio por registro (en texto base64)             */
+let BD = null;
+function abrirBD(){
+  return new Promise((ok, mal) => {
+    const pet = indexedDB.open('transector', 1);
+    pet.onupgradeneeded = () => {
+      const db = pet.result;
+      if (!db.objectStoreNames.contains('transectos')) db.createObjectStore('transectos', { keyPath: 'uuid' });
+      if (!db.objectStoreNames.contains('archivos')) db.createObjectStore('archivos', { keyPath: 'uuid' });
+    };
+    pet.onsuccess = () => { BD = pet.result; ok(BD); };
+    pet.onerror = () => mal(pet.error);
+  });
+}
+// Las operaciones de IndexedDB avisan con eventos; aquí las convertimos en promesas
+// para poder usar "await", que se lee más fácil.
+function bd(almacen, modo, accion){
+  return new Promise((ok, mal) => {
+    const tx = BD.transaction(almacen, modo);
+    const pet = accion(tx.objectStore(almacen));
+    tx.oncomplete = () => ok(pet && pet.result);
+    tx.onerror = () => mal(tx.error);
+  });
+}
+const bdGuardar = (alm, obj) => bd(alm, 'readwrite', s => s.put(obj));
+const bdLeer = (alm, clave) => bd(alm, 'readonly', s => s.get(clave));
+const bdTodos = alm => bd(alm, 'readonly', s => s.getAll());
+
+/* ---------- 5) CONEXIÓN CON TRANSECTOR CENTRAL ----------
+   Mandamos un POST con texto JSON. El tipo "text/plain" evita la consulta previa
+   (CORS) que Apps Script no sabe contestar. Si no responde en 60 s, se toma
+   como "sin conexión" (señal muy débil). */
+async function api(accion, datos){
+  const sesion = S.sesion ? { codigo: S.sesion.codigo, token: S.sesion.token } : null;
+  const corte = new AbortController();
+  const reloj = setTimeout(() => corte.abort(), 60000);
+  let resp;
+  try {
+    resp = await fetch(URL_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ accion, sesion, datos: datos || {} }),
+      signal: corte.signal
+    });
+  } catch(e){ throw new Error('SINRED'); }
+  finally { clearTimeout(reloj); }
+  if (!resp.ok) throw new Error('El servidor respondió con un error (' + resp.status + ').');
+  const r = await resp.json();
+  if (!r.ok){
+    // Sesión vencida (cambió la contraseña o se desactivó al usuario): pedir entrar de nuevo.
+    if (String(r.error).indexOf('SESION:') === 0) sesionVencida(r.error.slice(7).trim());
+    throw new Error(r.error || 'Respuesta no válida del servidor.');
+  }
+  return r.data;
+}
+const esSinRed = e => String(e && e.message || e) === 'SINRED';
+
+/* ---------- Estado general de la app ---------- */
+const S = {
+  sesion: LS.get('sesion', null),      // { codigo, nombre, token }
+  datos: LS.get('datos', null),        // sentimientos, catálogo, asignados, segundosRuta
+  actual: null                          // transecto abierto (si hay)
+};
+
+// Ventanas modales: devuelve el elemento .caja para llenarlo.
+function abrirModal(html, completa){
+  const m = document.createElement('div');
+  m.className = 'modal' + (completa ? ' completa' : '');
+  m.innerHTML = '<div class="caja">' + html + '</div>';
+  $('#modales').appendChild(m);
+  return m;
+}
+// Pregunta con botones (sustituye a confirm/prompt, que en el celular se ven feos).
+function preguntar(titulo, texto, opciones){
+  opciones = opciones || {};
+  return new Promise(ok => {
+    const m = abrirModal(`<h3>${esc(titulo)}</h3><p style="margin:0 0 14px">${texto}</p>
+      ${opciones.campo ? `<label class="campo">${esc(opciones.campo)}<input id="mCampo"></label>` : ''}
+      <div style="display:flex;gap:10px"><button class="btn ancho" data-r="no">${esc(opciones.no || 'Cancelar')}</button>
+      <button class="btn ancho ${opciones.peligro ? 'rojo' : 'prim'}" data-r="si">${esc(opciones.si || 'Aceptar')}</button></div>`);
+    m.addEventListener('click', e => {
+      const b = e.target.closest('[data-r]'); if (!b) return;
+      const campo = $('#mCampo', m);
+      m.remove();
+      ok(b.dataset.r === 'si' ? (opciones.campo ? (campo.value.trim() || '') : true) : (opciones.campo ? null : false));
+    });
+  });
+}
+
+/* ---------- 6) SESIÓN Y ENTRADA ---------- */
+// "cuentas" guarda, por código de usuario, lo necesario para volver a entrar SIN señal:
+// { U01: { nombre, token, verificador } }.  El verificador es una huella que solo
+// coincide si se escribe la contraseña correcta.
+function pantallaEntrada(aviso){
+  limpiarMapas();
+  $('#app').innerHTML = `
+    <div class="entrada"><div class="caja" style="text-align:center">
+      <img src="logo.png" alt="MAPEX">
+      <h1>Transector</h1>
+      <p>Transectos urbanos · MAPEX</p>
+      ${aviso ? `<div class="tarjeta" style="background:#FFF6E0;border-color:#F0D58A;font-size:14px;text-align:left">${esc(aviso)}</div>` : ''}
+      <div style="text-align:left">
+        <label class="campo">Usuario <input id="eCodigo" placeholder="U01" autocapitalize="characters" autocomplete="username" value="${esc(LS.get('ultimoCodigo', ''))}"></label>
+        <label class="campo">Contraseña <input id="ePass" type="password" autocomplete="current-password"></label>
+      </div>
+      <button class="btn prim ancho" id="eEntrar">Entrar</button>
+      <p class="ayuda" style="margin-top:16px">Tus datos de acceso te los da el equipo ORAP.</p>
+    </div></div>`;
+  $('#eEntrar').onclick = entrar;
+  $('#ePass').onkeydown = e => { if (e.key === 'Enter') entrar(); };
+  ($('#eCodigo').value ? $('#ePass') : $('#eCodigo')).focus();
+}
+
+async function entrar(){
+  const codigo = $('#eCodigo').value.trim().toUpperCase();
+  const pass = $('#ePass').value;
+  if (!codigo || !pass) return toast('Escribe tu usuario y tu contraseña.', 3000, true);
+  const h = huella(pass);
+  const cuentas = LS.get('cuentas', {});
+  $('#eEntrar').disabled = true;
+  try {
+    const r = await api('entrar', { codigo, pass: h });
+    cuentas[r.codigo] = { nombre: r.nombre, token: r.token, verificador: r.verificador };
+    LS.set('cuentas', cuentas);
+    iniciarSesion({ codigo: r.codigo, nombre: r.nombre, token: r.token });
+  } catch(e){
+    if (esSinRed(e)){
+      // Sin señal: solo se puede entrar si en ESTE celular ya se había entrado antes.
+      const c = cuentas[codigo];
+      if (c && c.token && huella('v|' + codigo + ':' + h) === c.verificador){
+        toast('Sin señal: entraste con los datos guardados en este celular.', 4000);
+        iniciarSesion({ codigo, nombre: c.nombre, token: c.token });
+      } else toast(c ? 'Contraseña incorrecta.' : 'Sin señal. La primera vez necesitas internet para entrar.', 5000, true);
+    } else toast(e.message, 5000, true);
+  } finally { const b = $('#eEntrar'); if (b) b.disabled = false; }
+}
+
+function iniciarSesion(sesion){
+  S.sesion = sesion; LS.set('sesion', sesion); LS.set('ultimoCodigo', sesion.codigo);
+  // Si había otro usuario usando este celular, olvidamos sus catálogos (sus transectos se quedan).
+  if (S.datos && S.datos.usuario && S.datos.usuario.codigo !== sesion.codigo){ S.datos = null; LS.del('datos'); }
+  pantallaInicio();
+  actualizarDatos();
+}
+
+async function salir(){
+  if (S.actual) return toast('Primero cierra el transecto en curso.', 3500, true);
+  if (!await preguntar('Salir', 'Lo que tengas pendiente de subir se queda guardado en el celular.', { si: 'Salir' })) return;
+  S.sesion = null; LS.del('sesion');
+  pantallaEntrada();
+}
+
+// Llamada por api() cuando el servidor dice que la sesión ya no vale.
+function sesionVencida(msg){
+  const cuentas = LS.get('cuentas', {});
+  if (S.sesion && cuentas[S.sesion.codigo]){ cuentas[S.sesion.codigo].token = ''; LS.set('cuentas', cuentas); }
+  S.sesion = null; LS.del('sesion');
+  if (!S.actual) pantallaEntrada(msg + ' Lo que tienes guardado en el celular no se pierde.');
+}
+
+// Pide al servidor los catálogos y los asignados (si hay señal) y los guarda en el celular.
+async function actualizarDatos(){
+  if (!S.sesion || !enLinea()) return;
+  try {
+    S.datos = await api('datosIniciales');
+    LS.set('datos', S.datos);
+    if (PANTALLA === 'inicio') pantallaInicio();
+  } catch(e){ /* sin señal o error: seguimos con lo guardado */ }
+}
+
+/* ---------- 7) INICIO ---------- */
+let PANTALLA = '';
+
+async function pantallaInicio(){
+  if (!S.sesion) return pantallaEntrada();
+  PANTALLA = 'inicio';
+  limpiarMapas();
+  const todos = await bdTodos('transectos');
+  const mios = todos.filter(t => t.usuario === S.sesion.codigo);
+  const pendientes = mios.filter(t => t.estado === 'cerrado' && !(t.subida && t.subida.completa));
+  const hechos = new Set(mios.map(t => t.uuid));
+  const asignados = ((S.datos && S.datos.asignados) || []).filter(a => !hechos.has(a.uuid));
+
+  $('#app').innerHTML = `
+    <div class="barra-sup">
+      <h1>Transector</h1>
+      <span class="estado-red">${enLinea() ? '● En línea' : '○ Sin señal'}</span>
+      <button id="bSalir">Salir</button>
+    </div>
+    <div class="contenido">
+      <p style="margin:2px 0 14px">Hola, <b>${esc(S.sesion.nombre)}</b> <span class="ayuda">(${esc(S.sesion.codigo)})</span></p>
+      <button class="btn turq ancho" id="bNuevo" style="padding:16px;font-size:18px;font-weight:700">＋ Nuevo transecto</button>
+
+      ${pendientes.length ? `
+      <div class="tarjeta" style="margin-top:14px;border-color:#F0D58A;background:#FFFBF0">
+        <h2>Pendientes de subir (${pendientes.length})</h2>
+        ${pendientes.map(t => `<div class="lista-item"><div class="info"><b>${esc(t.nombre)}</b>
+          <small>${esc(t.fecha)} · ${t.puntos.length} puntos</small></div></div>`).join('')}
+        <button class="btn prim ancho" id="bSubir" style="margin-top:8px">Subir ahora</button>
+        <p class="ayuda">Se suben solos cuando hay señal. Puedes forzarlo aquí.</p>
+      </div>` : ''}
+
+      <div class="tarjeta" style="margin-top:14px">
+        <h2>Transectos asignados</h2>
+        ${asignados.length ? asignados.map(a => `
+          <div class="lista-item"><div class="info"><b>${esc(a.nombre)}</b>
+            <small>${esc(a.parroquia || 'Sin parroquia')}${a.fecha ? ' · sugerido: ' + esc(a.fecha) : ''}</small></div>
+            <button class="btn chico prim" data-asig="${esc(a.uuid)}">Hacer</button></div>`).join('')
+          : '<div class="vacio">No tienes transectos asignados.</div>'}
+      </div>
+
+      <button class="btn ancho" id="bHistorial">📋 Mi historial</button>
+      ${!S.datos ? '<p class="ayuda" style="margin-top:14px">⚠ Aún no se han descargado los catálogos (sentimientos y parroquias). Conéctate a internet una vez.</p>' : ''}
+    </div>`;
+
+  $('#bSalir').onclick = salir;
+  $('#bNuevo').onclick = () => pantallaNuevo(null);
+  $('#bHistorial').onclick = pantallaHistorial;
+  if ($('#bSubir')) $('#bSubir').onclick = () => subirPendientes(true);
+  $$('[data-asig]').forEach(b => b.onclick = () => pantallaNuevo(asignados.find(a => a.uuid === b.dataset.asig)));
+}
+
+/* ---------- 8) NUEVO TRANSECTO ----------
+   asignado = null → transecto libre o con ruta propia.
+   asignado = {...} → transecto planeado desde el Central (trae su uuid y su ruta). */
+let rutaCargada = null;   // ruta planeada que subió el usuario (GeoJSON)
+
+function pantallaNuevo(asignado){
+  PANTALLA = 'nuevo';
+  if (!S.datos) return toast('Necesitas conectarte una vez para descargar los catálogos.', 4500, true);
+  rutaCargada = null;
+  const a = asignado || {};
+  // Lista de parroquias agrupada por decanato (<optgroup>).
+  const grupos = {};
+  S.datos.catalogo.forEach(c => (grupos[c.decanato] = grupos[c.decanato] || []).push(c));
+  const opcionesPar = '<option value="">(Sin parroquia / no sé)</option>' + Object.keys(grupos).map(d =>
+    `<optgroup label="${esc(d)}">${grupos[d].map(c => `<option value="${esc(c.idp)}" ${c.idp === a.idp ? 'selected' : ''}>${esc(c.parroquia)}</option>`).join('')}</optgroup>`).join('');
+
+  $('#app').innerHTML = `
+    <div class="barra-sup"><button id="bAtras">←</button><h1>${asignado ? 'Transecto asignado' : 'Nuevo transecto'}</h1></div>
+    <div class="contenido">
+      <div class="tarjeta">
+        <label class="campo">Nombre o zona del recorrido <input id="nNombre" value="${esc(a.nombre)}" placeholder="Ej. Centro Histórico – calle Madero"></label>
+        <label class="campo">Objetivo (opcional) <textarea id="nObjetivo" placeholder="¿Qué se busca observar?">${esc(a.objetivo)}</textarea></label>
+        <label class="campo">Parroquia <select id="nParroquia">${opcionesPar}</select></label>
+        <button class="btn chico" id="nDetectar">📍 Detectar por mi ubicación</button>
+        <p class="ayuda" id="nDetectado"></p>
+      </div>
+      <div class="tarjeta">
+        <h2>Tipo de recorrido</h2>
+        ${asignado ? `<p style="margin:0">Planeado por el equipo ORAP${a.rutaPlaneada ? ' (con ruta en el mapa).' : ' (sin ruta en el mapa).'}</p>` : `
+        <div class="opciones">
+          <label><input type="radio" name="nTipo" value="Libre" checked> Libre</label>
+          <label><input type="radio" name="nTipo" value="Planeado"> Planeado</label>
+        </div>
+        <div id="nRuta" class="oculto" style="margin-top:12px">
+          <label class="campo">Archivo del recorrido (KML de Google My Maps / Earth, GPX o GeoJSON)
+            <input type="file" id="nArchivo" accept=".kml,.gpx,.geojson,.json,application/vnd.google-earth.kml+xml,application/gpx+xml,application/geo+json,application/json">
+          </label>
+          <p class="ayuda" id="nRutaInfo"></p>
+        </div>`}
+      </div>
+      <button class="btn turq ancho" id="nIniciar" style="padding:16px;font-size:18px;font-weight:700">▶ Iniciar transecto</button>
+      <p class="ayuda" style="text-align:center;margin-top:10px">Al iniciar se registran la fecha y la hora. Un transecto no puede pasar de las 23:59 de hoy.</p>
+    </div>`;
+
+  $('#bAtras').onclick = pantallaInicio;
+  $('#nDetectar').onclick = detectarParroquia;
+  if (!asignado){
+    $$('input[name=nTipo]').forEach(r => r.onchange = () => $('#nRuta').classList.toggle('oculto', r.value !== 'Planeado' || !r.checked));
+    $('#nArchivo').onchange = async e => {
+      const f = e.target.files[0]; if (!f) return;
+      try {
+        rutaCargada = leerArchivoRuta(await f.text(), f.name);
+        $('#nRutaInfo').textContent = '✔ Ruta cargada: ' + kmDeTramos(rutaCargada.coordinates).toFixed(2) + ' km.';
+      } catch(err){ rutaCargada = null; $('#nRutaInfo').textContent = '✖ ' + err.message; }
+    };
+  }
+  $('#nIniciar').onclick = () => iniciarTransecto(asignado);
+}
+
+async function detectarParroquia(){
+  if (!enLinea()) return toast('Se necesita señal para detectar la parroquia. Elígela de la lista.', 4000, true);
+  $('#nDetectado').textContent = 'Buscando tu ubicación…';
+  try {
+    const p = await posicionActual();
+    const r = await api('parroquiaEn', { lat: p.coords.latitude, lng: p.coords.longitude });
+    if (r){ $('#nParroquia').value = r.idp; $('#nDetectado').textContent = '✔ ' + r.parroquia; }
+    else $('#nDetectado').textContent = 'Tu ubicación no cae dentro de ninguna parroquia del mapa. Elígela de la lista.';
+  } catch(e){ $('#nDetectado').textContent = esSinRed(e) ? 'Sin señal.' : e.message; }
+}
+
+// Lee un archivo de ruta y lo convierte a una geometría GeoJSON MultiLineString
+// (lista de líneas; cada línea es una lista de [lng, lat]).
+function leerArchivoRuta(texto, nombre){
+  const ext = nombre.toLowerCase().split('.').pop();
+  let lineas = [];
+  if (ext === 'kml' || ext === 'gpx'){
+    const xml = new DOMParser().parseFromString(texto, 'application/xml');
+    if (xml.querySelector('parsererror')) throw new Error('El archivo no se pudo leer.');
+    if (ext === 'kml'){
+      // <LineString><coordinates>lng,lat,alt lng,lat,alt ...</coordinates>
+      $$('LineString coordinates', xml).forEach(c => lineas.push(c.textContent.trim().split(/\s+/)
+        .map(t => t.split(',').map(Number)).filter(p => isFinite(p[0]) && isFinite(p[1])).map(p => [p[0], p[1]])));
+      // Recorridos grabados (gx:Track): <gx:coord>lng lat alt</gx:coord>
+      Array.from(xml.getElementsByTagName('gx:Track')).forEach(tr => lineas.push(
+        Array.from(tr.getElementsByTagName('gx:coord')).map(c => c.textContent.trim().split(/\s+/).map(Number)).map(p => [p[0], p[1]])));
+    } else {
+      // GPX: <trkseg><trkpt lat=".." lon=".."> o rutas <rte><rtept lat lon>
+      $$('trkseg', xml).forEach(s => lineas.push($$('trkpt', s).map(p => [+p.getAttribute('lon'), +p.getAttribute('lat')])));
+      $$('rte', xml).forEach(r => lineas.push($$('rtept', r).map(p => [+p.getAttribute('lon'), +p.getAttribute('lat')])));
+    }
+  } else {
+    const g = JSON.parse(texto);
+    const sacar = o => {
+      if (!o) return;
+      if (o.type === 'FeatureCollection') o.features.forEach(sacar);
+      else if (o.type === 'Feature') sacar(o.geometry);
+      else if (o.type === 'LineString') lineas.push(o.coordinates.map(p => [p[0], p[1]]));
+      else if (o.type === 'MultiLineString') o.coordinates.forEach(l => lineas.push(l.map(p => [p[0], p[1]])));
+    };
+    sacar(g);
+  }
+  lineas = lineas.filter(l => l.length >= 2);
+  if (!lineas.length) throw new Error('El archivo no trae ninguna línea (ruta). Dibuja el recorrido como línea, no como puntos.');
+  if (Math.abs(lineas[0][0][0]) > 180) throw new Error('Las coordenadas parecen estar en metros (UTM). Exporta en EPSG:4326.');
+  return { type: 'MultiLineString', coordinates: lineas.map(l => l.map(p => [+p[0].toFixed(6), +p[1].toFixed(6)])) };
+}
+
+async function iniciarTransecto(asignado){
+  const nombre = $('#nNombre').value.trim();
+  if (!nombre) return toast('Escribe el nombre o la zona del recorrido.', 3000, true);
+  let tipo = asignado ? 'Planeado' : $('input[name=nTipo]:checked').value;
+  if (tipo === 'Planeado' && !asignado && !rutaCargada){
+    if (!await preguntar('Sin ruta', 'Elegiste "Planeado" pero no cargaste el archivo de la ruta. ¿Iniciar como recorrido libre?', { si: 'Iniciar libre' })) return;
+    tipo = 'Libre';
+  }
+  if (horaAhora() >= HORA_LIMITE) return toast('Ya es muy tarde: un transecto no puede pasar de las 23:59.', 4000, true);
+  const idp = $('#nParroquia').value;
+  const par = S.datos.catalogo.find(c => c.idp === idp);
+  const ahora = new Date();
+  const t = {
+    uuid: asignado ? asignado.uuid : uuid(),
+    usuario: S.sesion.codigo,
+    nombre, objetivo: $('#nObjetivo').value.trim(),
+    idp: par ? par.idp : '', parroquia: par ? par.parroquia : '',
+    tipo, origenRuta: tipo === 'Libre' ? '' : (asignado ? 'Central' : 'App'),
+    rutaPlaneada: asignado ? (asignado.rutaPlaneada || null) : (tipo === 'Planeado' ? rutaCargada : null),
+    fecha: hoy(ahora), inicio: horaAhora(ahora), cierre: '', cierreAutomatico: false,
+    estado: 'abierto', pausas: [], ruta: [[]], puntos: [],
+    subida: { transecto: false, puntos: [], evidencias: [], completa: false }, folio: ''
+  };
+  await bdGuardar('transectos', t);
+  S.actual = t;
+  pantallaRecorrido();
+}
+
+/* ---------- 9) GPS Y RECORRIDO ---------- */
+let mapa = null, mapaDetalle = null;
+let capas = {};             // capas del mapa del recorrido (ruta, puntos, mi ubicación...)
+let vigilante = null;       // id de watchPosition
+let ultimaPos = null;       // última lectura del GPS
+let ultimoRegistro = 0;     // cuándo se guardó el último punto de la ruta (ms)
+let reloj = null;           // actualiza el cronómetro cada segundo
+let candadoPantalla = null; // Wake Lock: evita que la pantalla se apague sola
+let centrarEnMi = true;     // el mapa sigue al usuario hasta que lo mueva con el dedo
+
+// Pide UNA lectura del GPS (para capturar o detectar la parroquia).
+function posicionActual(){
+  return new Promise((ok, mal) => {
+    if (ultimaPos && Date.now() - ultimaPos.timestamp < 15000) return ok(ultimaPos);
+    navigator.geolocation.getCurrentPosition(ok, e => mal(new Error(textoErrorGPS(e))),
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 10000 });
+  });
+}
+function textoErrorGPS(e){
+  return e.code === 1 ? 'La app no tiene permiso para usar tu ubicación. Actívalo en los ajustes del navegador.'
+       : e.code === 3 ? 'El GPS tardó demasiado. Sal a un lugar abierto e intenta de nuevo.'
+       : 'No se pudo obtener tu ubicación.';
+}
+
+function crearMapa(id){
+  const m = L.map(id, { zoomControl: true, attributionControl: true });
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '© OpenStreetMap'
+  }).addTo(m);
+  return m;
+}
+function limpiarMapas(){
+  if (mapa){ mapa.remove(); mapa = null; capas = {}; }
+  if (mapaDetalle){ mapaDetalle.remove(); mapaDetalle = null; }
+}
+
+// Convierte tramos [[lng,lat],...] a la forma que pide Leaflet: [[lat,lng],...]
+const aLeaflet = tramos => tramos.map(t => t.map(p => [p[1], p[0]]));
+
+// Marcador numerado con el color del sentimiento.
+function iconoPunto(num, color){
+  return L.divIcon({ className: '', iconSize: [26, 26], iconAnchor: [13, 13],
+    html: `<div class="pin" style="background:${esc(color || '#87888A')}">${num}</div>` });
+}
+const sentimiento = id => ((S.datos && S.datos.sentimientos) || []).find(s => s.id === id) || null;
+
+function pantallaRecorrido(){
+  PANTALLA = 'recorrido';
+  limpiarMapas();
+  const t = S.actual;
+  $('#app').innerHTML = `
+    <div class="recorrido">
+      <div class="barra-sup">
+        <h1>${esc(t.nombre)}<span class="datos" id="rDatos"></span></h1>
+        <button id="rCentrar" title="Centrar en mi ubicación">◎</button>
+      </div>
+      <div id="rAviso" class="aviso-rec oculto"></div>
+      <div id="mapa"></div>
+      <div class="panel-rec">
+        <button class="btn" id="rPausa">⏸ Pausa</button>
+        <button class="btn-captura" id="rCaptura">📷 Captura</button>
+        <button class="btn rojo" id="rCerrar">■ Cerrar</button>
+      </div>
+    </div>`;
+
+  mapa = crearMapa('mapa');
+  mapa.setView([20.5888, -100.3899], 15);   // Querétaro, mientras llega el GPS
+  mapa.on('dragstart', () => { centrarEnMi = false; });
+  if (t.rutaPlaneada){
+    capas.planeada = L.polyline(aLeaflet(t.rutaPlaneada.coordinates), { color: '#6E67A8', weight: 5, opacity: .7, dashArray: '8 8' }).addTo(mapa);
+    mapa.fitBounds(capas.planeada.getBounds(), { padding: [30, 30] });
+    centrarEnMi = false;
+  }
+  capas.ruta = L.polyline(aLeaflet(t.ruta), { color: '#2E9AA5', weight: 5 }).addTo(mapa);
+  capas.puntos = L.layerGroup().addTo(mapa);
+  t.puntos.forEach(dibujarPunto);
+  if (ultimaPos) moverMiUbicacion(ultimaPos);
+
+  $('#rCentrar').onclick = () => { centrarEnMi = true; if (ultimaPos) mapa.setView([ultimaPos.coords.latitude, ultimaPos.coords.longitude], Math.max(mapa.getZoom(), 17)); };
+  $('#rCaptura').onclick = abrirCaptura;
+  $('#rPausa').onclick = alternarPausa;
+  $('#rCerrar').onclick = () => cerrarTransecto(false);
+
+  iniciarGPS();
+  pedirPantallaEncendida();
+  clearInterval(reloj);
+  reloj = setInterval(tic, 1000);
+  tic();
+}
+
+function dibujarPunto(p){
+  const s = sentimiento(p.sentimientoId);
+  const n = p.evidencias.length;
+  L.marker([p.lat, p.lng], { icon: iconoPunto(p.num, s && s.color) })
+    .bindPopup(`<b>Punto ${p.num}</b> · ${esc(p.fechaHora.slice(11, 16))}<br>${s ? esc(s.emoji + ' ' + s.sentimiento) + (p.intensidad ? ' (' + esc(p.intensidad) + ')' : '') + '<br>' : ''}${n} evidencia${n === 1 ? '' : 's'}`)
+    .addTo(capas.puntos);
+}
+
+function moverMiUbicacion(pos){
+  if (!mapa) return;
+  const ll = [pos.coords.latitude, pos.coords.longitude];
+  if (!capas.yo){
+    capas.precision = L.circle(ll, { radius: pos.coords.accuracy, color: '#5BC5CF', weight: 1, fillOpacity: .12 }).addTo(mapa);
+    capas.yo = L.circleMarker(ll, { radius: 8, color: '#fff', weight: 3, fillColor: '#1E88E5', fillOpacity: 1 }).addTo(mapa);
+    if (centrarEnMi) mapa.setView(ll, 17);
+  } else {
+    capas.yo.setLatLng(ll); capas.precision.setLatLng(ll).setRadius(pos.coords.accuracy);
+    if (centrarEnMi) mapa.panTo(ll);
+  }
+}
+
+// watchPosition = el navegador nos avisa cada vez que cambia la ubicación.
+function iniciarGPS(){
+  if (vigilante !== null) return;
+  if (!('geolocation' in navigator)) return avisoRec('Este celular no tiene GPS disponible en el navegador.');
+  vigilante = navigator.geolocation.watchPosition(alMoverse,
+    e => avisoRec(textoErrorGPS(e)),
+    { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 });
+}
+function detenerGPS(){
+  if (vigilante !== null){ navigator.geolocation.clearWatch(vigilante); vigilante = null; }
+}
+
+function alMoverse(pos){
+  ultimaPos = pos;
+  avisoRec('');
+  moverMiUbicacion(pos);
+  const t = S.actual;
+  if (!t || t.estado !== 'abierto' || enPausa(t)) return;
+  // ¿Toca guardar un punto de la ruta? (cada X segundos y solo si la lectura es buena)
+  const cada = ((S.datos && S.datos.segundosRuta) || 12) * 1000;
+  if (pos.coords.accuracy > PRECISION_MAX || Date.now() - ultimoRegistro < cada) return;
+  ultimoRegistro = Date.now();
+  const tramo = t.ruta[t.ruta.length - 1];
+  const p = [+pos.coords.longitude.toFixed(6), +pos.coords.latitude.toFixed(6)];
+  // Si no nos hemos movido ni 3 m, no repetimos el punto (estar parado no suma ruta).
+  if (tramo.length && metros(tramo[tramo.length - 1], p) < 3) return;
+  tramo.push(p);
+  capas.ruta && capas.ruta.setLatLngs(aLeaflet(t.ruta));
+  bdGuardar('transectos', t);
+}
+
+function avisoRec(msg){
+  const a = $('#rAviso'); if (!a) return;
+  a.textContent = msg; a.classList.toggle('oculto', !msg);
+}
+
+const enPausa = t => t.pausas.length > 0 && !t.pausas[t.pausas.length - 1].fin;
+
+// Segundos efectivos de recorrido (sin contar las pausas).
+function segundosEfectivos(t, hasta){
+  const fin = hasta || horaAhora();
+  let s = aSeg(fin) - aSeg(t.inicio);
+  t.pausas.forEach(p => { s -= aSeg(p.fin || fin) - aSeg(p.inicio); });
+  return s;
+}
+
+// Cada segundo: cronómetro, datos en la barra y revisión del límite del día.
+function tic(){
+  const t = S.actual;
+  if (!t) return;
+  if (hoy() !== t.fecha || horaAhora() >= HORA_LIMITE) return cerrarTransecto(true);
+  const d = $('#rDatos');
+  if (d) d.textContent = (enPausa(t) ? '⏸ En pausa · ' : '') + duracion(segundosEfectivos(t)) + ' · ' +
+    kmDeTramos(t.ruta).toFixed(2) + ' km · ' + t.puntos.length + ' puntos';
+  const pausa = $('#rPausa'), cap = $('#rCaptura');
+  if (pausa){ pausa.textContent = enPausa(t) ? '▶ Seguir' : '⏸ Pausa'; cap.disabled = enPausa(t); }
+}
+
+// Wake Lock: pide al celular que no apague la pantalla mientras se recorre.
+// (Si se apaga igual, la ruta tendrá un hueco que se une con línea recta.)
+async function pedirPantallaEncendida(){
+  try {
+    if ('wakeLock' in navigator && S.actual) candadoPantalla = await navigator.wakeLock.request('screen');
+  } catch(e){ /* algunos celulares no lo permiten: no pasa nada */ }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && S.actual){ pedirPantallaEncendida(); tic(); }
+});
+
+/* ---------- 10) CAPTURA DE UN PUNTO ----------
+   Mientras la ventana está abierta, lo capturado vive en "cap". Solo al tocar
+   "Guardar punto" se escribe en la base del celular. */
+let cap = null;
+let grabadora = null;
+
+async function abrirCaptura(){
+  const t = S.actual;
+  if (!t || enPausa(t)) return;
+  cap = { uuid: uuid(), num: t.puntos.length + 1, fecha: new Date(), pos: null,
+          sentimientoId: '', intensidad: '', fotos: [], audios: [], notas: [] };
+  const sents = (S.datos && S.datos.sentimientos) || [];
+  const m = abrirModal(`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+      <h3 style="margin:0;flex:1">Punto ${cap.num}</h3><span class="ayuda">${esc(horaAhora(cap.fecha).slice(0,5))}</span>
+    </div>
+    <p class="ayuda" id="cUbic">📍 Obteniendo ubicación…</p>
+
+    <div class="seccion"><b>Sentimiento percibido</b>
+      <div class="chips" id="cSent">${sents.map(s => `<button class="chip" data-s="${esc(s.id)}" data-color="${esc(s.color)}">${esc(s.emoji)} ${esc(s.sentimiento)}</button>`).join('') || '<span class="ayuda">Sin catálogo de sentimientos.</span>'}</div>
+      <div class="opciones" id="cInt" style="margin-top:10px">
+        ${['Baja','Media','Alta'].map(i => `<label><input type="radio" name="cInt" value="${i}"> ${i}</label>`).join('')}
+      </div>
+      <p class="ayuda">Intensidad (opcional).</p>
+    </div>
+
+    <div class="seccion"><b>Fotos</b>
+      <!-- "capture" abre directo la cámara; sin "capture" se puede elegir de la galería -->
+      <label class="btn chico" style="cursor:pointer">📷 Tomar foto
+        <input type="file" class="cFoto" accept="image/*" capture="environment" style="display:none"></label>
+      <label class="btn chico" style="cursor:pointer">🖼 Galería
+        <input type="file" class="cFoto" accept="image/*" multiple style="display:none"></label>
+      <div class="miniaturas" id="cFotos"></div>
+    </div>
+
+    <div class="seccion"><b>Grabaciones de voz</b>
+      <button class="btn chico" id="cGrabar">🎙 Grabar</button> <span id="cGrabando" class="grabando"></span>
+      <div id="cAudios"></div>
+    </div>
+
+    <div class="seccion"><b>Notas escritas</b>
+      <textarea id="cNota" style="width:100%;min-height:70px;padding:10px;border:1px solid var(--borde);border-radius:10px" placeholder="Lo que observas, escuchas, hueles…"></textarea>
+      <button class="btn chico" id="cAgregarNota" style="margin-top:6px">＋ Agregar nota</button>
+      <div id="cNotas"></div>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:18px">
+      <button class="btn ancho" id="cCancelar">Cancelar</button>
+      <button class="btn turq ancho" id="cGuardar" style="font-weight:700">Guardar punto</button>
+    </div>`, true);
+
+  // Ubicación del punto: la lectura más reciente del GPS.
+  posicionActual().then(p => {
+    cap.pos = p;
+    $('#cUbic', m).textContent = '📍 ' + p.coords.latitude.toFixed(5) + ', ' + p.coords.longitude.toFixed(5) + ' · precisión ±' + Math.round(p.coords.accuracy) + ' m';
+  }).catch(e => {
+    if (ultimaPos){ cap.pos = ultimaPos; $('#cUbic', m).textContent = '📍 Se usará la última ubicación conocida (hace ' + Math.round((Date.now() - ultimaPos.timestamp) / 1000) + ' s).'; }
+    else $('#cUbic', m).textContent = '⚠ ' + e.message;
+  });
+
+  $('#cSent', m).onclick = e => {
+    const b = e.target.closest('[data-s]'); if (!b) return;
+    cap.sentimientoId = cap.sentimientoId === b.dataset.s ? '' : b.dataset.s;   // tocar otra vez = quitar
+    $$('#cSent .chip', m).forEach(x => {
+      const sel = x.dataset.s === cap.sentimientoId;
+      x.classList.toggle('elegido', sel); x.style.background = sel ? x.dataset.color : ''; x.style.borderColor = sel ? x.dataset.color : '';
+    });
+  };
+  $('#cInt', m).onchange = e => { cap.intensidad = e.target.value; };
+  $$('.cFoto', m).forEach(inp => inp.onchange = async e => {
+    for (const f of e.target.files){
+      try { cap.fotos.push({ uuid: uuid(), datos: await reducirFoto(f), hora: horaAhora() }); }
+      catch(err){ toast('No se pudo leer una foto.', 3000, true); }
+    }
+    e.target.value = '';
+    pintarCaptura(m);
+  });
+  $('#cGrabar', m).onclick = () => alternarGrabacion(m);
+  $('#cAgregarNota', m).onclick = () => {
+    const txt = $('#cNota', m).value.trim(); if (!txt) return;
+    cap.notas.push({ uuid: uuid(), texto: txt, hora: horaAhora() });
+    $('#cNota', m).value = '';
+    pintarCaptura(m);
+  };
+  m.addEventListener('click', e => {
+    const q = e.target.closest('[data-quitar]'); if (!q) return;
+    const [lista, i] = q.dataset.quitar.split(':');
+    cap[lista].splice(Number(i), 1);
+    pintarCaptura(m);
+  });
+  $('#cCancelar', m).onclick = async () => {
+    const hay = cap.fotos.length + cap.audios.length + cap.notas.length + ($('#cNota', m).value.trim() ? 1 : 0);
+    if (hay && !await preguntar('Descartar punto', 'Se perderá lo que capturaste en este punto.', { si: 'Descartar', peligro: true })) return;
+    detenerGrabacion(); cap = null; m.remove();
+  };
+  $('#cGuardar', m).onclick = () => guardarPunto(m);
+}
+
+function pintarCaptura(m){
+  $('#cFotos', m).innerHTML = cap.fotos.map((f, i) =>
+    `<div class="mini"><img src="${f.datos}"><button class="quitar" data-quitar="fotos:${i}">✕</button></div>`).join('');
+  $('#cAudios', m).innerHTML = cap.audios.map((a, i) =>
+    `<div class="audio-item"><audio controls src="${a.datos}"></audio><span class="ayuda">${Math.round(a.duracion)} s</span><button class="btn chico" data-quitar="audios:${i}">✕</button></div>`).join('');
+  $('#cNotas', m).innerHTML = cap.notas.map((n, i) =>
+    `<div class="nota-item"><div>${esc(n.texto)}</div><button class="btn chico" data-quitar="notas:${i}">✕</button></div>`).join('');
+}
+
+// Reduce la foto a FOTO_MAX px y la convierte a JPEG: una foto de 4 MB queda en ~300 KB.
+function reducirFoto(archivo){
+  return new Promise((ok, mal) => {
+    const img = new Image();
+    const url = URL.createObjectURL(archivo);
+    img.onload = () => {
+      const esc_ = Math.min(1, FOTO_MAX / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.naturalWidth * esc_); c.height = Math.round(img.naturalHeight * esc_);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      ok(c.toDataURL('image/jpeg', 0.8));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); mal(new Error('foto')); };
+    img.src = url;
+  });
+}
+
+// Grabación de voz con MediaRecorder. Android graba en webm; iPhone en mp4.
+async function alternarGrabacion(m){
+  if (grabadora && grabadora.state === 'recording') return detenerGrabacion();
+  let flujo;
+  try { flujo = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch(e){ return toast('La app no tiene permiso para usar el micrófono.', 4000, true); }
+  const tipo = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/aac'].find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || '';
+  grabadora = new MediaRecorder(flujo, tipo ? { mimeType: tipo } : undefined);
+  const pedazos = [];
+  const inicio = Date.now();
+  grabadora.ondataavailable = e => { if (e.data.size) pedazos.push(e.data); };
+  grabadora.onstop = () => {
+    flujo.getTracks().forEach(tr => tr.stop());
+    clearInterval(grabadora._reloj);
+    const blob = new Blob(pedazos, { type: grabadora.mimeType || 'audio/webm' });
+    const lector = new FileReader();
+    lector.onload = () => {
+      if (!cap) return;
+      cap.audios.push({ uuid: uuid(), datos: lector.result, duracion: (Date.now() - inicio) / 1000, hora: horaAhora() });
+      pintarCaptura(m);
+    };
+    lector.readAsDataURL(blob);
+    $('#cGrabar', m).textContent = '🎙 Grabar'; $('#cGrabando', m).textContent = '';
+  };
+  grabadora.start();
+  $('#cGrabar', m).textContent = '⏹ Detener';
+  grabadora._reloj = setInterval(() => { $('#cGrabando', m).textContent = '● ' + duracion((Date.now() - inicio) / 1000); }, 500);
+}
+function detenerGrabacion(){ if (grabadora && grabadora.state === 'recording') grabadora.stop(); }
+
+async function guardarPunto(m){
+  if (grabadora && grabadora.state === 'recording') return toast('Primero detén la grabación.', 3000, true);
+  // Si quedó texto escrito sin "Agregar", también se guarda como nota.
+  const pendiente = $('#cNota', m).value.trim();
+  if (pendiente) cap.notas.push({ uuid: uuid(), texto: pendiente, hora: horaAhora() });
+  if (!cap.pos) return toast('Todavía no hay ubicación del GPS. Espera unos segundos.', 3500, true);
+  if (!cap.sentimientoId && !cap.fotos.length && !cap.audios.length && !cap.notas.length)
+    return toast('El punto está vacío: elige un sentimiento o agrega una foto, audio o nota.', 4000, true);
+
+  const t = S.actual;
+  const evidencias = [];
+  // Primero los archivos (pesados) en su almacén; en el punto solo queda la referencia.
+  for (const [i, f] of cap.fotos.entries()){
+    await bdGuardar('archivos', { uuid: f.uuid, transecto: t.uuid, datos: f.datos });
+    evidencias.push({ uuid: f.uuid, tipo: 'Foto', orden: i + 1, hora: f.hora });
+  }
+  for (const [i, a] of cap.audios.entries()){
+    await bdGuardar('archivos', { uuid: a.uuid, transecto: t.uuid, datos: a.datos });
+    evidencias.push({ uuid: a.uuid, tipo: 'Audio', orden: i + 1, hora: a.hora, duracion: Math.round(a.duracion) });
+  }
+  cap.notas.forEach((n, i) => evidencias.push({ uuid: n.uuid, tipo: 'Nota', orden: i + 1, hora: n.hora, texto: n.texto }));
+
+  const p = {
+    uuid: cap.uuid, num: cap.num, fechaHora: fechaHora(cap.fecha),
+    lat: +cap.pos.coords.latitude.toFixed(6), lng: +cap.pos.coords.longitude.toFixed(6),
+    precision: Math.round(cap.pos.coords.accuracy), sentimientoId: cap.sentimientoId, intensidad: cap.intensidad,
+    evidencias
+  };
+  t.puntos.push(p);
+  await bdGuardar('transectos', t);
+  dibujarPunto(p);
+  cap = null; m.remove();
+  tic();
+  toast('Punto ' + p.num + ' guardado ✓');
+}
+
+/* ---------- 11) PAUSA Y CIERRE ---------- */
+async function alternarPausa(){
+  const t = S.actual;
+  if (enPausa(t)){
+    t.pausas[t.pausas.length - 1].fin = horaAhora();
+    t.ruta.push([]);   // la ruta sigue en un tramo nuevo (no se une con lo anterior)
+    ultimoRegistro = 0;
+    toast('Recorrido reanudado.');
+  } else {
+    const motivo = await preguntar('Pausar el recorrido', 'Mientras esté en pausa no se registra la ruta ni se puede capturar.', { campo: 'Motivo (opcional)', si: 'Pausar' });
+    if (motivo === null) return;
+    t.pausas.push({ inicio: horaAhora(), fin: '', motivo });
+  }
+  await bdGuardar('transectos', t);
+  tic();
+}
+
+// automatico = true → lo cierra la app al llegar las 23:59 (o si cambió el día).
+async function cerrarTransecto(automatico){
+  const t = S.actual;
+  if (!t || t.estado !== 'abierto') return;
+  if (!automatico){
+    if (!await preguntar('Cerrar transecto', `Llevas <b>${t.puntos.length}</b> puntos de captura. Una vez cerrado ya no se puede modificar.`, { si: 'Cerrar transecto', peligro: true })) return;
+  }
+  // Si el día ya cambió (la app estuvo cerrada), el cierre queda a las 23:59:59 de la fecha del transecto.
+  const cierre = (hoy() !== t.fecha) ? '23:59:59' : horaAhora();
+  if (enPausa(t)) t.pausas[t.pausas.length - 1].fin = cierre;
+  t.cierre = cierre;
+  t.cierreAutomatico = !!automatico;
+  t.estado = 'cerrado';
+  await bdGuardar('transectos', t);
+
+  clearInterval(reloj); detenerGPS();
+  try { if (candadoPantalla) await candadoPantalla.release(); } catch(e){}
+  candadoPantalla = null; S.actual = null; ultimoRegistro = 0;
+
+  toast(automatico ? 'El transecto se cerró solo porque llegó el fin del día.' : 'Transecto cerrado ✓', 5000);
+  // Si la sesión venció durante el recorrido, se pide entrar de nuevo (el transecto queda guardado).
+  if (!S.sesion) return pantallaEntrada('Tu sesión terminó. Entra de nuevo para subir el transecto; está guardado en el celular.');
+  await pantallaInicio();
+  subirPendientes(true);
+}
+
+/* ---------- 12) SUBIDA (SINCRONIZACIÓN) ----------
+   Orden: 1) datos del transecto  2) cada punto con sus notas  3) cada foto/audio
+          4) confirmar. Todo lleva UUID: si algo se manda dos veces no se duplica.
+   Lo que ya se subió se apunta en t.subida, así si se corta la señal a la mitad
+   se continúa donde se quedó. */
+let subiendo = false;
+
+async function subirPendientes(avisar){
+  if (subiendo || !S.sesion) return;
+  if (!enLinea()){ if (avisar) toast('Sin señal: se subirá en cuanto haya internet.', 3500); return; }
+  const todos = await bdTodos('transectos');
+  const pend = todos.filter(t => t.usuario === S.sesion.codigo && t.estado === 'cerrado' && !(t.subida && t.subida.completa));
+  if (!pend.length) return;
+  subiendo = true;
+  let ok = 0;
+  try {
+    for (const t of pend){
+      if (avisar) toast('Subiendo «' + t.nombre + '»…', 60000);
+      if (await subirTransecto(t)) ok++;
+    }
+    if (avisar) toast(ok === pend.length ? '✓ Todo subido a Transector Central.' : 'Se subieron ' + ok + ' de ' + pend.length + '. Se reintentará solo.', 4500);
+  } catch(e){
+    if (avisar) toast(esSinRed(e) ? 'Se perdió la señal. Se reintentará solo.' : 'No se pudo subir: ' + e.message, 5000, true);
+  } finally {
+    subiendo = false;
+    if (PANTALLA === 'inicio') pantallaInicio();
+  }
+}
+
+async function subirTransecto(t){
+  const sub = t.subida;
+  const cuenta = tipo => t.puntos.reduce((n, p) => n + p.evidencias.filter(e => e.tipo === tipo).length, 0);
+
+  // 1) Datos generales
+  if (!sub.transecto){
+    const tramos = t.ruta.filter(r => r.length >= 2);
+    const r = await api('subirTransecto', {
+      uuid: t.uuid, nombre: t.nombre, idp: t.idp, objetivo: t.objetivo, tipo: t.tipo, origenRuta: t.origenRuta,
+      fecha: t.fecha, inicio: t.inicio, cierre: t.cierre, cierreAutomatico: t.cierreAutomatico,
+      pausas: t.pausas,
+      rutaRecorrida: tramos.length ? { type: 'MultiLineString', coordinates: tramos } : null,
+      rutaPlaneada: t.origenRuta === 'App' ? t.rutaPlaneada : null,
+      puntos: t.puntos.length, fotos: cuenta('Foto'), audios: cuenta('Audio'), notas: cuenta('Nota')
+    });
+    sub.transecto = true; t.folio = r.folio;
+    await bdGuardar('transectos', t);
+  }
+  // 2) Puntos (con sus notas)
+  for (const p of t.puntos){
+    if (sub.puntos.includes(p.uuid)) continue;
+    await api('subirPunto', {
+      uuid: p.uuid, uuidTransecto: t.uuid, num: p.num, fechaHora: p.fechaHora, lat: p.lat, lng: p.lng,
+      precision: p.precision, sentimientoId: p.sentimientoId, intensidad: p.intensidad,
+      notas: p.evidencias.filter(e => e.tipo === 'Nota').map(e => ({ uuid: e.uuid, orden: e.orden, texto: e.texto, hora: e.hora }))
+    });
+    sub.puntos.push(p.uuid);
+    p.evidencias.filter(e => e.tipo === 'Nota').forEach(e => sub.evidencias.push(e.uuid));
+    await bdGuardar('transectos', t);
+  }
+  // 3) Fotos y audios, uno por uno
+  for (const p of t.puntos){
+    for (const e of p.evidencias){
+      if (e.tipo === 'Nota' || sub.evidencias.includes(e.uuid)) continue;
+      const arch = await bdLeer('archivos', e.uuid);
+      if (!arch) continue;   // (no debería pasar)
+      await api('subirArchivo', { uuid: e.uuid, uuidPunto: p.uuid, uuidTransecto: t.uuid, tipo: e.tipo,
+        orden: e.orden, hora: e.hora, duracion: e.duracion, datos: arch.datos });
+      sub.evidencias.push(e.uuid);
+      await bdGuardar('transectos', t);
+    }
+  }
+  // 4) Confirmar con el servidor: él dice qué tiene. Lo que no tenga se volverá a mandar.
+  const r = await api('confirmar', { uuid: t.uuid });
+  sub.puntos = r.puntos; sub.evidencias = r.evidencias; sub.completa = r.completa; t.folio = r.folio || t.folio;
+  await bdGuardar('transectos', t);
+  return r.completa;
+}
+
+/* ---------- 13) HISTORIAL Y DETALLE ---------- */
+async function pantallaHistorial(){
+  PANTALLA = 'historial';
+  limpiarMapas();
+  $('#app').innerHTML = `
+    <div class="barra-sup"><button id="bAtras">←</button><h1>Mi historial</h1></div>
+    <div class="contenido"><div class="tarjeta" id="hLista"><div class="vacio">Cargando…</div></div></div>`;
+  $('#bAtras').onclick = pantallaInicio;
+
+  // 1) Los que están en este celular
+  const locales = (await bdTodos('transectos')).filter(t => t.usuario === S.sesion.codigo && t.estado === 'cerrado');
+  const lista = locales.map(t => ({ uuid: t.uuid, folio: t.folio, nombre: t.nombre, fecha: t.fecha, inicio: t.inicio,
+    puntos: t.puntos.length, local: true, subido: t.subida.completa, km: kmDeTramos(t.ruta),
+    minEfectivos: segundosEfectivos(t, t.cierre) / 60 }));
+  pintarHistorial(lista);
+
+  // 2) Los del servidor (por si se hicieron en otro celular)
+  if (enLinea()){
+    try {
+      const remotos = await api('historial');
+      remotos.forEach(r => {
+        const l = lista.find(x => x.uuid === r.uuid);
+        if (l) l.folio = r.folio;
+        else lista.push({ uuid: r.uuid, folio: r.folio, nombre: r.nombre, fecha: r.fecha, inicio: r.inicio,
+          puntos: r.puntos, local: false, subido: r.sincronizacion === 'Completa', km: r.km, minEfectivos: r.minEfectivos });
+      });
+      if (PANTALLA === 'historial') pintarHistorial(lista);
+    } catch(e){ /* sin señal: solo lo local */ }
+  }
+}
+
+function pintarHistorial(lista){
+  lista.sort((a, b) => (b.fecha + b.inicio).localeCompare(a.fecha + a.inicio));
+  $('#hLista').innerHTML = lista.length ? lista.map(t => `
+    <div class="lista-item" data-abrir="${esc(t.uuid)}" style="cursor:pointer">
+      <div class="info"><b>${esc(t.nombre)}</b>
+        <small>${esc(t.fecha)} · ${duracionMin(t.minEfectivos)} · ${(+t.km || 0).toFixed(2)} km · ${t.puntos} puntos${t.folio ? ' · ' + esc(t.folio) : ''}</small></div>
+      ${t.subido ? '<span class="etiqueta si">Subido</span>' : '<span class="etiqueta no">Pendiente</span>'}
+    </div>`).join('') : '<div class="vacio">Todavía no tienes transectos cerrados.</div>';
+  $$('[data-abrir]').forEach(el => el.onclick = () => pantallaDetalle(el.dataset.abrir));
+}
+
+// Detalle de un transecto (solo lectura). Si está en el celular se ve sin señal;
+// si no, se pide al servidor y las fotos/audios se descargan al tocarlos.
+async function pantallaDetalle(id){
+  PANTALLA = 'detalle';
+  limpiarMapas();
+  $('#app').innerHTML = `
+    <div class="barra-sup"><button id="bAtras">←</button><h1 id="dTitulo">Transecto</h1></div>
+    <div class="contenido" id="dCont"><div class="vacio">Cargando…</div></div>`;
+  $('#bAtras').onclick = pantallaHistorial;
+
+  let d;
+  const t = await bdLeer('transectos', id);
+  if (t){
+    // Del celular: lo convertimos a la misma forma que manda el servidor.
+    d = { folio: t.folio, nombre: t.nombre, parroquia: t.parroquia, objetivo: t.objetivo, tipo: t.tipo,
+      estado: t.cierreAutomatico ? 'Cierre automático' : 'Cerrado', fecha: t.fecha, inicio: t.inicio, cierre: t.cierre,
+      minEfectivos: segundosEfectivos(t, t.cierre) / 60, minPausa: (aSeg(t.cierre) - aSeg(t.inicio)) / 60 - segundosEfectivos(t, t.cierre) / 60,
+      km: kmDeTramos(t.ruta), pausas: t.pausas, rutaPlaneada: t.rutaPlaneada,
+      rutaRecorrida: { type: 'MultiLineString', coordinates: t.ruta.filter(r => r.length >= 2) },
+      puntosDetalle: t.puntos, local: true };
+  } else {
+    try { d = await api('leerTransecto', { uuid: id }); }
+    catch(e){ $('#dCont').innerHTML = `<div class="vacio">${esSinRed(e) ? 'Sin señal: este transecto no está en el celular.' : esc(e.message)}</div>`; return; }
+  }
+  $('#dTitulo').textContent = d.nombre;
+  const lineas = g => !g ? [] : g.type === 'MultiLineString' ? g.coordinates : g.type === 'LineString' ? [g.coordinates] : [];
+
+  $('#dCont').innerHTML = `
+    <div id="mapaDetalle"></div>
+    <div class="tarjeta">
+      <div class="resumen">
+        <span>Folio</span><b>${esc(d.folio || '(aún no se sube)')}</b>
+        <span>Fecha</span><b>${esc(d.fecha)}</b>
+        <span>Horario</span><b>${esc(String(d.inicio).slice(0,5))} – ${esc(String(d.cierre).slice(0,5))}</b>
+        <span>Recorrido efectivo</span><b>${duracionMin(d.minEfectivos)}</b>
+        <span>En pausa</span><b>${duracionMin(d.minPausa)}</b>
+        <span>Distancia</span><b>${(+d.km || 0).toFixed(2)} km</b>
+        <span>Tipo</span><b>${esc(d.tipo)}</b>
+        <span>Parroquia</span><b>${esc(d.parroquia || '—')}</b>
+      </div>
+      ${d.estado === 'Cierre automático' ? '<p class="ayuda">⚠ Se cerró automáticamente al terminar el día.</p>' : ''}
+      ${d.objetivo ? `<p style="margin:10px 0 0;font-size:14px"><b>Objetivo:</b> ${esc(d.objetivo)}</p>` : ''}
+    </div>
+    <div class="tarjeta"><h2>Puntos de captura (${d.puntosDetalle.length})</h2>
+      ${d.puntosDetalle.map(p => {
+        const s = sentimiento(p.sentimientoId);
+        return `<div class="punto-det">
+          <h4><span class="pin" style="background:${esc(s ? s.color : '#87888A')}">${p.num}</span>
+            ${esc(String(p.fechaHora).slice(11, 16))} · ${s ? esc(s.emoji + ' ' + s.sentimiento) : esc(p.sentimiento || 'Sin sentimiento')}${p.intensidad ? ' (' + esc(p.intensidad) + ')' : ''}</h4>
+          ${p.evidencias.map(e => e.tipo === 'Nota'
+            ? `<div class="nota-item"><div>${esc(e.texto)}</div></div>`
+            : `<div data-ev="${esc(e.uuid)}" data-id="${esc(e.idArchivo || '')}" data-tipo="${e.tipo}" style="margin-top:8px">
+                 <button class="btn chico">${e.tipo === 'Foto' ? '🖼 Ver foto ' : '🔊 Escuchar audio '}${e.orden}</button></div>`).join('')}
+        </div>`; }).join('') || '<div class="vacio">Sin puntos.</div>'}
+    </div>`;
+
+  // Mapa: ruta planeada (punteada), recorrida y puntos.
+  mapaDetalle = crearMapa('mapaDetalle');
+  const grupo = L.featureGroup().addTo(mapaDetalle);
+  if (lineas(d.rutaPlaneada).length) L.polyline(aLeaflet(lineas(d.rutaPlaneada)), { color: '#6E67A8', weight: 4, opacity: .7, dashArray: '8 8' }).addTo(grupo);
+  if (lineas(d.rutaRecorrida).length) L.polyline(aLeaflet(lineas(d.rutaRecorrida)), { color: '#2E9AA5', weight: 5 }).addTo(grupo);
+  d.puntosDetalle.forEach(p => { const s = sentimiento(p.sentimientoId); L.marker([p.lat, p.lng], { icon: iconoPunto(p.num, s && s.color) }).addTo(grupo); });
+  if (grupo.getLayers().length) mapaDetalle.fitBounds(grupo.getBounds(), { padding: [25, 25], maxZoom: 18 });
+  else mapaDetalle.setView([20.5888, -100.3899], 13);
+
+  // Ver una foto o escuchar un audio (del celular o, si no está, del servidor).
+  $$('[data-ev]').forEach(cont => cont.querySelector('button').onclick = async () => {
+    const btn = cont.querySelector('button');
+    let datos = null;
+    const local = await bdLeer('archivos', cont.dataset.ev);
+    if (local) datos = local.datos;
+    else if (cont.dataset.id){
+      btn.disabled = true; btn.textContent = 'Descargando…';
+      try { const r = await api('leerArchivo', { idArchivo: cont.dataset.id }); datos = 'data:' + r.mime + ';base64,' + r.datos; }
+      catch(e){ btn.disabled = false; btn.textContent = 'Reintentar'; return toast(esSinRed(e) ? 'Sin señal.' : e.message, 3500, true); }
+    }
+    if (!datos) return toast('El archivo no está disponible.', 3000, true);
+    cont.innerHTML = cont.dataset.tipo === 'Foto'
+      ? `<img src="${datos}" style="width:100%;border-radius:10px">`
+      : `<audio controls src="${datos}" style="width:100%"></audio>`;
+  });
+}
+
+/* ---------- 14) ARRANQUE ---------- */
+window.addEventListener('online', () => { actualizarDatos(); subirPendientes(false); if (PANTALLA === 'inicio') pantallaInicio(); });
+window.addEventListener('offline', () => { if (PANTALLA === 'inicio') pantallaInicio(); });
+setInterval(() => { if (enLinea()) subirPendientes(false); }, 60000);   // reintento cada minuto
+// Aviso si se intenta cerrar la pestaña con un transecto abierto (lo capturado NO se pierde).
+window.addEventListener('beforeunload', e => { if (S.actual){ e.preventDefault(); e.returnValue = ''; } });
+
+(async function(){
+  try { await abrirBD(); }
+  catch(e){ $('#app').innerHTML = '<div class="contenido"><div class="tarjeta">Este navegador no permite guardar datos (IndexedDB). Usa Chrome o Safari actualizados y fuera del modo incógnito.</div></div>'; return; }
+  // Pedir al navegador que no borre nuestros datos si se llena el almacenamiento.
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+
+  if (!S.sesion) return pantallaEntrada();
+
+  // ¿Quedó un transecto abierto? (se cerró la app, se apagó el celular...)
+  const abierto = (await bdTodos('transectos')).find(t => t.usuario === S.sesion.codigo && t.estado === 'abierto');
+  if (abierto){
+    S.actual = abierto;
+    if (hoy() !== abierto.fecha || horaAhora() >= HORA_LIMITE) await cerrarTransecto(true);
+    else { pantallaRecorrido(); toast('Continuando el transecto en curso.', 3000); }
+  } else pantallaInicio();
+  actualizarDatos();
+  subirPendientes(false);
+})();
+
+// Service worker: guarda la app en el celular para que abra rápido y sin señal.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(err => console.error('Service worker:', err));
+}
+</script>
+</body>
+</html>
