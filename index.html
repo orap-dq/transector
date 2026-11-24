@@ -62,7 +62,7 @@ label.campo textarea{min-height:70px;resize:vertical}
 .estado-red{font-size:12px;padding:3px 9px;border-radius:20px;background:rgba(255,255,255,.2)}
 
 /* ---------- Pantalla de entrada ---------- */
-.entrada{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;background:#fff}
+.entrada{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;background:#fff}
 .entrada img{height:170px;margin-bottom:8px}
 .entrada h1{margin:0;color:var(--lila-osc);font-size:26px}
 .entrada p{color:var(--gris);margin:4px 0 22px;font-size:14px}
@@ -337,13 +337,28 @@ function pantallaEntrada(aviso){
       ${aviso ? `<div class="tarjeta" style="background:#FFF6E0;border-color:#F0D58A;font-size:14px;text-align:left">${esc(aviso)}</div>` : ''}
       <div style="text-align:left">
         <label class="campo">Usuario <input id="eCodigo" placeholder="U01" autocapitalize="characters" autocomplete="username" value="${esc(LS.get('ultimoCodigo', ''))}"></label>
-        <label class="campo">Contraseña <input id="ePass" type="password" autocomplete="current-password"></label>
+        <label class="campo">Contraseña
+          <span style="position:relative;display:block">
+            <input id="ePass" type="password" autocomplete="current-password" style="padding-right:52px">
+            <!-- Botón del "ojito": cambia el campo entre type=password (puntos) y type=text (visible) -->
+            <button type="button" id="eVer" aria-label="Mostrar contraseña"
+              style="position:absolute;right:4px;top:50%;transform:translateY(-50%);margin-top:2px;border:0;background:none;font-size:20px;padding:6px 10px">👁</button>
+          </span>
+        </label>
       </div>
       <button class="btn prim ancho" id="eEntrar">Entrar</button>
       <p class="ayuda" style="margin-top:16px">Tus datos de acceso te los da el equipo ORAP.</p>
     </div></div>`;
   $('#eEntrar').onclick = entrar;
   $('#ePass').onkeydown = e => { if (e.key === 'Enter') entrar(); };
+  $('#eVer').onclick = () => {
+    const campo = $('#ePass');
+    const ver = campo.type === 'password';
+    campo.type = ver ? 'text' : 'password';
+    $('#eVer').textContent = ver ? '🙈' : '👁';
+    $('#eVer').setAttribute('aria-label', ver ? 'Ocultar contraseña' : 'Mostrar contraseña');
+    campo.focus();
+  };
   ($('#eCodigo').value ? $('#ePass') : $('#eCodigo')).focus();
 }
 
@@ -466,11 +481,12 @@ function pantallaNuevo(asignado){
   if (!S.datos) return toast('Necesitas conectarte una vez para descargar los catálogos.', 4500, true);
   rutaCargada = null;
   const a = asignado || {};
-  // Lista de parroquias agrupada por decanato (<optgroup>).
-  const grupos = {};
-  S.datos.catalogo.forEach(c => (grupos[c.decanato] = grupos[c.decanato] || []).push(c));
-  const opcionesPar = '<option value="">(Sin parroquia / no sé)</option>' + Object.keys(grupos).map(d =>
-    `<optgroup label="${esc(d)}">${grupos[d].map(c => `<option value="${esc(c.idp)}" ${c.idp === a.idp ? 'selected' : ''}>${esc(c.parroquia)}</option>`).join('')}</optgroup>`).join('');
+  // Decanato de la parroquia ya elegida (si viene de un asignado).
+  const parElegida = S.datos.catalogo.find(c => c.idp === a.idp);
+  // Lista de decanatos sin repetir, en el orden del catálogo (1, 2, 3...).
+  const decanatos = [...new Set(S.datos.catalogo.map(c => c.decanato))];
+  const opcionesDec = '<option value="">(Elige el decanato)</option>' + decanatos.map(d =>
+    `<option ${parElegida && parElegida.decanato === d ? 'selected' : ''}>${esc(d)}</option>`).join('');
 
   $('#app').innerHTML = `
     <div class="barra-sup"><button id="bAtras">←</button><h1>${asignado ? 'Transecto asignado' : 'Nuevo transecto'}</h1></div>
@@ -478,7 +494,9 @@ function pantallaNuevo(asignado){
       <div class="tarjeta">
         <label class="campo">Nombre o zona del recorrido <input id="nNombre" value="${esc(a.nombre)}" placeholder="Ej. Centro Histórico – calle Madero"></label>
         <label class="campo">Objetivo (opcional) <textarea id="nObjetivo" placeholder="¿Qué se busca observar?">${esc(a.objetivo)}</textarea></label>
-        <label class="campo">Parroquia <select id="nParroquia">${opcionesPar}</select></label>
+        <!-- Primero el decanato; luego solo las parroquias de ese decanato -->
+        <label class="campo">Decanato <select id="nDecanato">${opcionesDec}</select></label>
+        <label class="campo">Parroquia <select id="nParroquia"></select></label>
         <button class="btn chico" id="nDetectar">📍 Detectar por mi ubicación</button>
         <p class="ayuda" id="nDetectado"></p>
       </div>
@@ -502,6 +520,8 @@ function pantallaNuevo(asignado){
 
   $('#bAtras').onclick = pantallaInicio;
   $('#nDetectar').onclick = detectarParroquia;
+  $('#nDecanato').onchange = () => llenarParroquias($('#nDecanato').value, '');
+  llenarParroquias(parElegida ? parElegida.decanato : '', a.idp);
   if (!asignado){
     $$('input[name=nTipo]').forEach(r => r.onchange = () => $('#nRuta').classList.toggle('oculto', r.value !== 'Planeado' || !r.checked));
     $('#nArchivo').onchange = async e => {
@@ -515,13 +535,31 @@ function pantallaNuevo(asignado){
   $('#nIniciar').onclick = () => iniciarTransecto(asignado);
 }
 
+// Llena la lista de parroquias SOLO con las del decanato elegido.
+function llenarParroquias(decanato, elegida){
+  const sel = $('#nParroquia');
+  if (!decanato){
+    sel.innerHTML = '<option value="">(Primero elige el decanato · o déjalo sin parroquia)</option>';
+    sel.disabled = true;
+    return;
+  }
+  sel.disabled = false;
+  sel.innerHTML = '<option value="">(Sin parroquia / no sé)</option>' + S.datos.catalogo
+    .filter(c => c.decanato === decanato)
+    .map(c => `<option value="${esc(c.idp)}" ${c.idp === elegida ? 'selected' : ''}>${esc(c.parroquia)}</option>`).join('');
+}
+
 async function detectarParroquia(){
   if (!enLinea()) return toast('Se necesita señal para detectar la parroquia. Elígela de la lista.', 4000, true);
   $('#nDetectado').textContent = 'Buscando tu ubicación…';
   try {
     const p = await posicionActual();
     const r = await api('parroquiaEn', { lat: p.coords.latitude, lng: p.coords.longitude });
-    if (r){ $('#nParroquia').value = r.idp; $('#nDetectado').textContent = '✔ ' + r.parroquia; }
+    if (r){
+      $('#nDecanato').value = r.decanato;          // primero el decanato...
+      llenarParroquias(r.decanato, r.idp);         // ...y luego su parroquia, ya elegida
+      $('#nDetectado').textContent = '✔ ' + r.parroquia;
+    }
     else $('#nDetectado').textContent = 'Tu ubicación no cae dentro de ninguna parroquia del mapa. Elígela de la lista.';
   } catch(e){ $('#nDetectado').textContent = esSinRed(e) ? 'Sin señal.' : e.message; }
 }
