@@ -27,10 +27,12 @@ Todo queda ubicado en el mapa. La información se sube a **Transector Central**,
 | **Transecto libre o planeado** | Un transecto planeado trae su ruta dibujada en el mapa (archivo KML de Google My Maps / Earth, GPX o GeoJSON). La puede subir el usuario o asignarla el equipo ORAP. |
 | **Inicio, pausa y cierre** | Se registran fecha, hora de inicio y de cierre, pausas (con motivo), tiempo efectivo y distancia recorrida. |
 | **Un día como máximo** | Si un transecto sigue abierto a las 23:59, la app lo cierra sola (*cierre automático*). |
+| **Corregir en el camino** | Mientras el transecto está abierto, cada punto se puede editar o borrar (desde su marcador en el mapa). |
 | **Sellado** | Una vez cerrado, el transecto ya no se puede modificar desde la app. |
 | **Parroquia** | Se elige por decanato y parroquia, o se detecta automáticamente con la ubicación. |
 | **Funciona sin señal** | Todo se guarda primero en el celular y se sube después, cuando hay internet. Si se corta la señal a la mitad, continúa donde se quedó. |
 | **Historial** | Cada usuario puede ver y abrir sus transectos: mapa, puntos, fotos, audios y notas. |
+| **Liberar espacio** | Al subir un transecto, la app ofrece borrar del celular sus fotos y audios (ya están en Drive). También hay un botón *Liberar espacio*. |
 
 ## ¿Quién puede usarla?
 
@@ -78,7 +80,7 @@ Este repositorio contiene **solo la app del celular**. El servidor (Apps Script)
 | `sw.js` | *Service worker*: guarda la app en el celular para que abra sin señal y guarda las teselas del mapa ya vistas. |
 | `manifest.json` | Datos para instalar la app (nombre, colores, íconos). |
 | `icon-192.png`, `icon-512.png`, `icon-maskable-512.png` | Íconos de la app. |
-| `logo.png` | Logo de la pantalla de entrada (temporalmente, el del MAPEX). |
+| `logo.png` | Logo de la pantalla de entrada (temporalmente, el emblema del MAPEX). |
 | `leaflet/` | Librería de mapas [Leaflet 1.9.4](https://leafletjs.com/), incluida aquí para que funcione sin internet. |
 
 ### Cómo publicar una versión nueva

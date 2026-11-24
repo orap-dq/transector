@@ -7,7 +7,7 @@
 
 // Cada vez que cambies cualquier archivo de la app, sube este número
 // (v1 → v2 → v3...). Así los celulares saben que hay versión nueva.
-const VERSION = 'transector-v3';
+const VERSION = 'transector-v4';
 const TESELAS = 'transector-teselas';   // caché aparte para el mapa (no se borra al cambiar de versión)
 const MAX_TESELAS = 2500;               // unas 2 500 teselas ≈ 40-60 MB como máximo
 

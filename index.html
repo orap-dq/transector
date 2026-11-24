@@ -261,6 +261,7 @@ function bd(almacen, modo, accion){
 const bdGuardar = (alm, obj) => bd(alm, 'readwrite', s => s.put(obj));
 const bdLeer = (alm, clave) => bd(alm, 'readonly', s => s.get(clave));
 const bdTodos = alm => bd(alm, 'readonly', s => s.getAll());
+const bdBorrar = (alm, clave) => bd(alm, 'readwrite', s => s.delete(clave));
 
 /* ---------- 5) CONEXIÓN CON TRANSECTOR CENTRAL ----------
    Mandamos un POST con texto JSON. El tipo "text/plain" evita la consulta previa
@@ -431,6 +432,7 @@ async function pantallaInicio(){
   const pendientes = mios.filter(t => t.estado === 'cerrado' && !(t.subida && t.subida.completa));
   const hechos = new Set(mios.map(t => t.uuid));
   const asignados = ((S.datos && S.datos.asignados) || []).filter(a => !hechos.has(a.uuid));
+  const liberablesHoy = mios.filter(t => t.estado === 'cerrado' && t.subida && t.subida.completa && !t.archivosLiberados);
 
   $('#app').innerHTML = `
     <div class="barra-sup">
@@ -440,6 +442,14 @@ async function pantallaInicio(){
     </div>
     <div class="contenido">
       <p style="margin:2px 0 14px">Hola, <b>${esc(S.sesion.nombre)}</b> <span class="ayuda">(${esc(S.sesion.codigo)})</span></p>
+      ${avisoIphone() ? `
+      <div class="tarjeta" id="avisoIos" style="background:#FFF6E0;border-color:#F0D58A">
+        <h2 style="color:#7A5A10">📱 En iPhone, instala la app</h2>
+        <p style="margin:0;font-size:14.5px">Si usas Transector desde Safari sin instalarla, el iPhone puede borrar lo que tengas
+          guardado (y pendiente de subir) después de unos días sin usarla.</p>
+        <p style="margin:8px 0 0;font-size:14.5px">Toca <b>Compartir</b> <span style="font-size:18px">⬆︎</span> y luego <b>“Agregar a inicio”</b>. Después abre Transector desde ese ícono.</p>
+        <button class="btn chico" id="bAvisoIos" style="margin-top:10px">Entendido</button>
+      </div>` : ''}
       <button class="btn turq ancho" id="bNuevo" style="padding:16px;font-size:18px;font-weight:700">＋ Nuevo transecto</button>
 
       ${pendientes.length ? `
@@ -461,14 +471,26 @@ async function pantallaInicio(){
       </div>
 
       <button class="btn ancho" id="bHistorial">📋 Mi historial</button>
+      <button class="btn ancho ${liberablesHoy.length ? '' : 'oculto'}" id="bLiberar" style="margin-top:10px">🧹 Liberar espacio (${liberablesHoy.length} subido${liberablesHoy.length === 1 ? '' : 's'})</button>
       ${!S.datos ? '<p class="ayuda" style="margin-top:14px">⚠ Aún no se han descargado los catálogos (sentimientos y parroquias). Conéctate a internet una vez.</p>' : ''}
     </div>`;
 
   $('#bSalir').onclick = salir;
   $('#bNuevo').onclick = () => pantallaNuevo(null);
   $('#bHistorial').onclick = pantallaHistorial;
+  $('#bLiberar').onclick = preguntarLiberar;
+  if ($('#bAvisoIos')) $('#bAvisoIos').onclick = () => { avisoIosVisto = true; $('#avisoIos').remove(); };
   if ($('#bSubir')) $('#bSubir').onclick = () => subirPendientes(true);
   $$('[data-asig]').forEach(b => b.onclick = () => pantallaNuevo(asignados.find(a => a.uuid === b.dataset.asig)));
+}
+
+// ¿Es un iPhone/iPad usando la app desde Safari (sin instalar)? Solo entonces se avisa.
+let avisoIosVisto = false;   // "Entendido" lo oculta mientras la app esté abierta
+function avisoIphone(){
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+              (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);   // iPad nuevo se presenta como Mac
+  const instalada = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+  return ios && !instalada && !avisoIosVisto;
 }
 
 /* ---------- 8) NUEVO TRANSECTO ----------
@@ -697,6 +719,13 @@ function pantallaRecorrido(){
   mapa = crearMapa('mapa');
   mapa.setView([20.5888, -100.3899], 15);   // Querétaro, mientras llega el GPS
   mapa.on('dragstart', () => { centrarEnMi = false; });
+  // Botones Editar / Borrar dentro de la ventanita de cada punto
+  mapa.on('popupopen', e => {
+    const el = e.popup.getElement();
+    const ed = el.querySelector('[data-editar-punto]'), bo = el.querySelector('[data-borrar-punto]');
+    if (ed) ed.onclick = () => { mapa.closePopup(); abrirCaptura(S.actual.puntos.find(x => x.uuid === ed.dataset.editarPunto)); };
+    if (bo) bo.onclick = () => borrarPunto(bo.dataset.borrarPunto);
+  });
   if (t.rutaPlaneada){
     capas.planeada = L.polyline(aLeaflet(t.rutaPlaneada.coordinates), { color: '#6E67A8', weight: 5, opacity: .7, dashArray: '8 8' }).addTo(mapa);
     mapa.fitBounds(capas.planeada.getBounds(), { padding: [30, 30] });
@@ -708,7 +737,7 @@ function pantallaRecorrido(){
   if (ultimaPos) moverMiUbicacion(ultimaPos);
 
   $('#rCentrar').onclick = () => { centrarEnMi = true; if (ultimaPos) mapa.setView([ultimaPos.coords.latitude, ultimaPos.coords.longitude], Math.max(mapa.getZoom(), 17)); };
-  $('#rCaptura').onclick = abrirCaptura;
+  $('#rCaptura').onclick = () => abrirCaptura(null);
   $('#rPausa').onclick = alternarPausa;
   $('#rCerrar').onclick = () => cerrarTransecto(false);
 
@@ -723,7 +752,9 @@ function dibujarPunto(p){
   const s = sentimiento(p.sentimientoId);
   const n = p.evidencias.length;
   L.marker([p.lat, p.lng], { icon: iconoPunto(p.num, s && s.color) })
-    .bindPopup(`<b>Punto ${p.num}</b> · ${esc(p.fechaHora.slice(11, 16))}<br>${s ? esc(s.emoji + ' ' + s.sentimiento) + (p.intensidad ? ' (' + esc(p.intensidad) + ')' : '') + '<br>' : ''}${n} evidencia${n === 1 ? '' : 's'}`)
+    .bindPopup(`<b>Punto ${p.num}</b> · ${esc(p.fechaHora.slice(11, 16))}<br>${s ? esc(s.emoji + ' ' + s.sentimiento) + (p.intensidad ? ' (' + esc(p.intensidad) + ')' : '') + '<br>' : ''}${n} evidencia${n === 1 ? '' : 's'}
+      <div style="display:flex;gap:6px;margin-top:8px"><button class="btn chico" data-editar-punto="${esc(p.uuid)}">✎ Editar</button>
+      <button class="btn chico" style="color:var(--rojo)" data-borrar-punto="${esc(p.uuid)}">🗑 Borrar</button></div>`)
     .addTo(capas.puntos);
 }
 
@@ -815,15 +846,31 @@ document.addEventListener('visibilitychange', () => {
 let cap = null;
 let grabadora = null;
 
-async function abrirCaptura(){
+// existente = un punto ya guardado → se abre para EDITARLO (solo mientras el transecto está abierto).
+async function abrirCaptura(existente){
   const t = S.actual;
   if (!t || enPausa(t)) return;
-  cap = { uuid: uuid(), num: t.puntos.length + 1, fecha: new Date(), pos: null,
-          sentimientoId: '', intensidad: '', fotos: [], audios: [], notas: [] };
+  if (existente && existente.uuid){
+    // Reconstruimos "cap" con lo que tiene el punto: fotos y audios se leen de la base del celular.
+    const archivo = async e => ((await bdLeer('archivos', e.uuid)) || {}).datos;
+    cap = { uuid: existente.uuid, num: existente.num, fecha: new Date(existente.fechaHora.replace(' ', 'T')),
+      pos: { coords: { latitude: existente.lat, longitude: existente.lng, accuracy: existente.precision }, timestamp: Date.now() },
+      sentimientoId: existente.sentimientoId, intensidad: existente.intensidad || '', editando: true,
+      originales: existente.evidencias.filter(e => e.tipo !== 'Nota').map(e => e.uuid),
+      fotos: [], audios: [], notas: [] };
+    for (const e of existente.evidencias){
+      if (e.tipo === 'Foto') cap.fotos.push({ uuid: e.uuid, datos: await archivo(e), hora: e.hora });
+      if (e.tipo === 'Audio') cap.audios.push({ uuid: e.uuid, datos: await archivo(e), duracion: e.duracion || 0, hora: e.hora });
+      if (e.tipo === 'Nota') cap.notas.push({ uuid: e.uuid, texto: e.texto, hora: e.hora });
+    }
+  } else {
+    cap = { uuid: uuid(), num: t.puntos.length + 1, fecha: new Date(), pos: null,
+            sentimientoId: '', intensidad: '', fotos: [], audios: [], notas: [] };
+  }
   const sents = (S.datos && S.datos.sentimientos) || [];
   const m = abrirModal(`
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
-      <h3 style="margin:0;flex:1">Punto ${cap.num}</h3><span class="ayuda">${esc(horaAhora(cap.fecha).slice(0,5))}</span>
+      <h3 style="margin:0;flex:1">${cap.editando ? 'Editar punto' : 'Punto'} ${cap.num}</h3><span class="ayuda">${esc(horaAhora(cap.fecha).slice(0,5))}</span>
     </div>
     <p class="ayuda" id="cUbic">📍 Obteniendo ubicación…</p>
 
@@ -860,8 +907,14 @@ async function abrirCaptura(){
       <button class="btn turq ancho" id="cGuardar" style="font-weight:700">Guardar punto</button>
     </div>`, true);
 
-  // Ubicación del punto: la lectura más reciente del GPS.
-  posicionActual().then(p => {
+  // Ubicación del punto: la lectura más reciente del GPS. (Al editar se conserva la original.)
+  if (cap.editando){
+    $('#cUbic', m).textContent = '📍 ' + cap.pos.coords.latitude.toFixed(5) + ', ' + cap.pos.coords.longitude.toFixed(5) + ' · ubicación original del punto';
+    const chip = $(`#cSent [data-s="${cap.sentimientoId}"]`, m);
+    if (chip){ chip.classList.add('elegido'); chip.style.background = chip.dataset.color; chip.style.borderColor = chip.dataset.color; }
+    const r = $(`input[name=cInt][value="${cap.intensidad}"]`, m); if (r) r.checked = true;
+    pintarCaptura(m);
+  } else posicionActual().then(p => {
     cap.pos = p;
     $('#cUbic', m).textContent = '📍 ' + p.coords.latitude.toFixed(5) + ', ' + p.coords.longitude.toFixed(5) + ' · precisión ±' + Math.round(p.coords.accuracy) + ' m';
   }).catch(e => {
@@ -901,7 +954,8 @@ async function abrirCaptura(){
   });
   $('#cCancelar', m).onclick = async () => {
     const hay = cap.fotos.length + cap.audios.length + cap.notas.length + ($('#cNota', m).value.trim() ? 1 : 0);
-    if (hay && !await preguntar('Descartar punto', 'Se perderá lo que capturaste en este punto.', { si: 'Descartar', peligro: true })) return;
+    if (hay && !await preguntar(cap.editando ? 'Descartar cambios' : 'Descartar punto',
+      cap.editando ? 'El punto se queda como estaba.' : 'Se perderá lo que capturaste en este punto.', { si: 'Descartar', peligro: true })) return;
     detenerGrabacion(); cap = null; m.remove();
   };
   $('#cGuardar', m).onclick = () => guardarPunto(m);
@@ -992,12 +1046,39 @@ async function guardarPunto(m){
     precision: Math.round(cap.pos.coords.accuracy), sentimientoId: cap.sentimientoId, intensidad: cap.intensidad,
     evidencias
   };
-  t.puntos.push(p);
+  if (cap.editando){
+    // Archivos que se quitaron al editar: se borran del celular.
+    const quedan = new Set(evidencias.map(e => e.uuid));
+    for (const id of cap.originales) if (!quedan.has(id)) await bdBorrar('archivos', id);
+    t.puntos[t.puntos.findIndex(x => x.uuid === p.uuid)] = p;
+  } else t.puntos.push(p);
   await bdGuardar('transectos', t);
-  dibujarPunto(p);
+  redibujarPuntos();
+  const editado = cap.editando;
   cap = null; m.remove();
   tic();
-  toast('Punto ' + p.num + ' guardado ✓');
+  toast('Punto ' + p.num + (editado ? ' actualizado ✓' : ' guardado ✓'));
+}
+
+function redibujarPuntos(){
+  if (!capas.puntos) return;
+  capas.puntos.clearLayers();
+  S.actual.puntos.forEach(dibujarPunto);
+}
+
+// Borrar un punto mientras el transecto sigue abierto. Los siguientes se renumeran
+// (todavía no se ha subido nada, así que no hay problema).
+async function borrarPunto(id){
+  const t = S.actual;
+  const p = t.puntos.find(x => x.uuid === id); if (!p) return;
+  if (!await preguntar('Borrar punto ' + p.num, 'Se borrarán sus fotos, audios y notas. No se puede deshacer.', { si: 'Borrar', peligro: true })) return;
+  for (const e of p.evidencias) if (e.tipo !== 'Nota') await bdBorrar('archivos', e.uuid);
+  t.puntos = t.puntos.filter(x => x.uuid !== id);
+  t.puntos.forEach((x, i) => { x.num = i + 1; });
+  await bdGuardar('transectos', t);
+  mapa.closePopup();
+  redibujarPuntos(); tic();
+  toast('Punto borrado.');
 }
 
 /* ---------- 11) PAUSA Y CIERRE ---------- */
@@ -1064,12 +1145,57 @@ async function subirPendientes(avisar){
       if (await subirTransecto(t)) ok++;
     }
     if (avisar) toast(ok === pend.length ? '✓ Todo subido a Transector Central.' : 'Se subieron ' + ok + ' de ' + pend.length + '. Se reintentará solo.', 4500);
+    if (ok) ofrecerLiberar = true;
   } catch(e){
     if (avisar) toast(esSinRed(e) ? 'Se perdió la señal. Se reintentará solo.' : 'No se pudo subir: ' + e.message, 5000, true);
   } finally {
     subiendo = false;
-    if (PANTALLA === 'inicio') pantallaInicio();
+    if (PANTALLA === 'inicio') await pantallaInicio();
+    // Recién subido: preguntar si se libera el espacio (no en medio de un recorrido).
+    if (ofrecerLiberar && !S.actual && !$('#modales').children.length){ ofrecerLiberar = false; preguntarLiberar(); }
   }
+}
+
+/* ---------- 12b) LIBERAR ESPACIO EN EL CELULAR ----------
+   Las fotos y audios de un transecto YA SUBIDO (completo) ya están en Drive. Se pueden
+   borrar del celular; el transecto se sigue viendo en el historial (las fotos y audios
+   se descargan del servidor cuando hay señal). Los datos, la ruta y las notas se quedan. */
+let ofrecerLiberar = false;
+
+async function liberables(){
+  return (await bdTodos('transectos')).filter(t => S.sesion && t.usuario === S.sesion.codigo &&
+    t.estado === 'cerrado' && t.subida && t.subida.completa && !t.archivosLiberados);
+}
+// Tamaño aproximado (en MB) de las fotos y audios de esos transectos.
+async function megasDe(lista){
+  let car = 0;
+  for (const t of lista) for (const p of t.puntos) for (const e of p.evidencias){
+    if (e.tipo === 'Nota') continue;
+    const a = await bdLeer('archivos', e.uuid); if (a && a.datos) car += a.datos.length;
+  }
+  return car * 0.75 / 1048576;   // el texto base64 pesa 4/3 del archivo real
+}
+async function liberar(lista){
+  for (const t of lista){
+    for (const p of t.puntos) for (const e of p.evidencias) if (e.tipo !== 'Nota') await bdBorrar('archivos', e.uuid);
+    t.archivosLiberados = true;
+    await bdGuardar('transectos', t);
+  }
+}
+async function preguntarLiberar(){
+  const lista = await liberables();
+  if (!lista.length) return toast('No hay espacio por liberar: no hay fotos ni audios de transectos ya subidos.', 4000);
+  const mb = await megasDe(lista);
+  const tam = mb < 1 ? Math.max(1, Math.round(mb * 1024)) + ' KB' : mb.toFixed(1) + ' MB';
+  if (mb < 0.01){ await liberar(lista); return; }   // sin fotos ni audios: solo se marca
+  const ok = await preguntar('Liberar espacio',
+    `${lista.length === 1 ? 'El transecto ya está' : 'Los ' + lista.length + ' transectos ya están'} en Transector Central.
+     ¿Borrar del celular sus fotos y audios (<b>${tam}</b>)?<br><br>
+     <span class="ayuda">Seguirás viéndolos en tu historial cuando tengas señal.</span>`, { si: 'Liberar espacio', no: 'Ahora no' });
+  if (!ok) return;
+  await liberar(lista);
+  toast('✓ Se liberaron ' + tam + '.');
+  if (PANTALLA === 'inicio') pantallaInicio();
 }
 
 async function subirTransecto(t){
@@ -1174,7 +1300,11 @@ async function pantallaDetalle(id){
   $('#bAtras').onclick = pantallaHistorial;
 
   let d;
-  const t = await bdLeer('transectos', id);
+  let t = await bdLeer('transectos', id);
+  // Si sus fotos y audios ya se borraron del celular, con señal se ve desde el servidor
+  // (así las fotos se pueden descargar). Sin señal, se ve lo que quedó en el celular.
+  let sinArchivos = false;
+  if (t && t.archivosLiberados){ if (enLinea()) t = null; else sinArchivos = true; }
   if (t){
     // Del celular: lo convertimos a la misma forma que manda el servidor.
     d = { folio: t.folio, nombre: t.nombre, parroquia: t.parroquia, objetivo: t.objetivo, tipo: t.tipo,
@@ -1204,6 +1334,7 @@ async function pantallaDetalle(id){
         <span>Parroquia</span><b>${esc(d.parroquia || '—')}</b>
       </div>
       ${d.estado === 'Cierre automático' ? '<p class="ayuda">⚠ Se cerró automáticamente al terminar el día.</p>' : ''}
+      ${sinArchivos ? '<p class="ayuda">📵 Las fotos y audios se borraron del celular para liberar espacio. Con señal se pueden ver desde el servidor.</p>' : ''}
       ${d.objetivo ? `<p style="margin:10px 0 0;font-size:14px"><b>Objetivo:</b> ${esc(d.objetivo)}</p>` : ''}
     </div>
     <div class="tarjeta"><h2>Puntos de captura (${d.puntosDetalle.length})</h2>
